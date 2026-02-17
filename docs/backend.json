@@ -141,7 +141,8 @@
       "description": "Represents a customer's order.",
       "properties": {
         "customerName": { "type": "string", "description": "Name of the customer who placed the order." },
-        "customerEmail": { "type": "string", "description": "Email of the customer.", "format": "email"},
+        "customerEmail": { "type": "string", "description": "Email of the customer, captured from Paystack.", "format": "email"},
+        "customerPhone": { "type": "string", "description": "Phone number of the customer." },
         "products": {
           "type": "array",
           "items": {
@@ -159,11 +160,10 @@
         "shippingAddress": {
           "type": "object",
           "properties": {
-            "county": { "type": "string" },
             "region": { "type": "string" },
             "description": { "type": "string" }
           },
-          "required": ["county", "description"]
+          "required": ["description", "region"]
         },
         "status": {
           "type": "string",

@@ -16,8 +16,6 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { kenyanCounties } from '@/lib/kenyan-counties';
 import { verifyPayment } from '@/ai/flows/verify-payment';
 
 const WhatsAppIcon = () => (
@@ -32,8 +30,7 @@ const WhatsAppIcon = () => (
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name is required'),
-  email: z.string().email('A valid email is required'),
-  county: z.string().min(1, 'County is required'),
+  phone: z.string().min(10, 'A valid phone number is required'),
   region: z.string().min(1, 'Region/Town is required'),
   description: z.string().min(1, 'Address description is required'),
 });
@@ -50,7 +47,7 @@ export default function CartSidebar() {
 
   const checkoutForm = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutSchema),
-    defaultValues: { name: '', email: '', county: '', region: '', description: '' },
+    defaultValues: { name: '', phone: '', region: '', description: '' },
   });
 
   const handleCheckoutViaWhatsApp = () => {
@@ -69,10 +66,11 @@ export default function CartSidebar() {
 
   const paystackConfig = {
     reference: (new Date()).getTime().toString(),
-    email: checkoutData?.email || "customer@example.com",
+    email: "customer@example.com", // Paystack will ask for email in the popup
     amount: cartTotal * 100, // Amount in cents
     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
     currency: 'KES',
+    phone: checkoutData?.phone,
     metadata: {
       cartItems: cart.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })),
       total: cartTotal,
@@ -80,7 +78,6 @@ export default function CartSidebar() {
       custom_fields: [
         { display_name: "Cart Total", variable_name: "cart_total", value: `Ksh ${cartTotal.toFixed(2)}`},
         { display_name: "Number of Items", variable_name: "number_of_items", value: cartCount },
-        { display_name: "County", variable_name: "shipping_county", value: checkoutData?.county || "" },
         { display_name: "Region", variable_name: "shipping_region", value: checkoutData?.region || "" },
         { display_name: "Address Description", variable_name: "shipping_description", value: checkoutData?.description || "" }
       ]
@@ -101,12 +98,11 @@ export default function CartSidebar() {
       products: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
       totalAmount: cartTotal,
       shippingAddress: {
-        county: checkoutData.county,
         region: checkoutData.region,
         description: checkoutData.description,
       },
       customerName: checkoutData.name,
-      customerEmail: checkoutData.email,
+      customerPhone: checkoutData.phone,
     };
 
     try {
@@ -145,7 +141,12 @@ export default function CartSidebar() {
   const handleCheckoutSubmit = (data: CheckoutFormData) => {
     setCheckoutData(data);
     setIsCheckoutDialogOpen(false);
-    initializePayment({ onSuccess: onPaystackSuccess, onClose: onPaystackClose });
+    // We update the config right before calling, to ensure latest data is used
+    initializePayment({ 
+        onSuccess: onPaystackSuccess, 
+        onClose: onPaystackClose,
+        config: { ...paystackConfig, phone: data.phone, metadata: { ...paystackConfig.metadata, customerName: data.name } }
+    });
   }
 
   const handlePayNowClick = () => {
@@ -259,25 +260,13 @@ export default function CartSidebar() {
                     <FormMessage />
                   </FormItem>
                 )}/>
-                <FormField control={checkoutForm.control} name="email" render={({ field }) => (
+                <FormField control={checkoutForm.control} name="phone" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email Address</FormLabel>
-                    <FormControl><Input type="email" placeholder="e.g., jane.doe@example.com" {...field} /></FormControl>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl><Input type="tel" placeholder="e.g., 0700000000" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}/>
-              <FormField control={checkoutForm.control} name="county" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>County</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Select a county" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {kenyanCounties.map(county => <SelectItem key={county} value={county}>{county}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}/>
               <FormField control={checkoutForm.control} name="region" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Region / Town</FormLabel>

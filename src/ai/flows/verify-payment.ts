@@ -7,7 +7,7 @@
  * - VerifyPaymentOutput - The return type for the verifyPayment function.
  */
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import axios from 'axios';
 import { adminDb } from '@/lib/firebase-admin';
 import type { Order } from '@/lib/types';
@@ -26,12 +26,11 @@ const VerifyPaymentInputSchema = z.object({
     ),
     totalAmount: z.number(),
     shippingAddress: z.object({
-      county: z.string(),
       region: z.string(),
       description: z.string(),
     }),
     customerName: z.string(),
-    customerEmail: z.string().email(),
+    customerPhone: z.string(),
   }),
 });
 export type VerifyPaymentInput = z.infer<typeof VerifyPaymentInputSchema>;
@@ -77,25 +76,30 @@ const verifyPaymentFlow = ai.defineFlow(
 
       if (status === 200 && data?.data?.status === 'success') {
         // Payment is successful.
-        // Verify that the amount paid matches the order total.
         const amountPaid = data.data.amount / 100; // Paystack amount is in kobo/cents
         if (amountPaid < orderPayload.totalAmount) {
-          // This could be a security issue. Log it and reject.
           console.warn(
             `Tampering detected. Paystack amount ${amountPaid} is less than order total ${orderPayload.totalAmount}`
           );
-          // TODO: Potentially refund the transaction here.
           return {
             success: false,
             message: 'Payment amount does not match order total.',
           };
         }
+        
+        const customerEmail = data.data.customer?.email;
 
         // Amount is valid, create the order in Firestore.
+        const { products, totalAmount, shippingAddress, customerName, customerPhone } = orderPayload;
         const orderData: Omit<Order, 'id' | 'createdAt'> & {
           createdAt: FieldValue;
         } = {
-          ...orderPayload,
+          products,
+          totalAmount,
+          shippingAddress,
+          customerName,
+          customerPhone,
+          customerEmail,
           status: 'pending',
           createdAt: FieldValue.serverTimestamp(),
         };

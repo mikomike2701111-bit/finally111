@@ -41,7 +41,6 @@ export type Order = {
   }[];
   totalAmount: number;
   shippingAddress: {
-    county: string;
     region: string;
     description: string;
   };
@@ -50,6 +49,7 @@ export type Order = {
   // Optional customer info
   customerName?: string;
   customerEmail?: string;
+  customerPhone?: string;
 };
 
 export type WithId<T> = T & { id: string };

@@ -518,6 +518,7 @@ function DashboardContent() {
                   <TableCell>
                     <div className="font-medium">{order.customerName || 'N/A'}</div>
                     <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
+                    <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
                   </TableCell>
                   <TableCell>
                     <ul className="text-xs space-y-1">
@@ -528,7 +529,7 @@ function DashboardContent() {
                   </TableCell>
                   <TableCell>Ksh {order.totalAmount.toFixed(2)}</TableCell>
                   <TableCell className="text-xs">
-                      {order.shippingAddress.description},<br/>{order.shippingAddress.region}, {order.shippingAddress.county}
+                      {order.shippingAddress.description},<br/>{order.shippingAddress.region}
                   </TableCell>
                   <TableCell className="text-right">
                     <Select

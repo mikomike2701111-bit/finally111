@@ -15,8 +15,6 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { kenyanCounties } from '@/lib/kenyan-counties';
 import { verifyPayment } from '@/ai/flows/verify-payment';
 
 
@@ -38,8 +36,7 @@ const WhatsAppIcon = () => (
 
 const addressSchema = z.object({
   name: z.string().min(2, 'Name is required'),
-  email: z.string().email('A valid email is required'),
-  county: z.string().min(1, 'County is required'),
+  phone: z.string().min(10, 'A valid phone number is required'),
   region: z.string().min(1, 'Region/Town is required'),
   description: z.string().min(1, 'Address description is required'),
 });
@@ -61,7 +58,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   
   const addressForm = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
-    defaultValues: { name: '', email: '', county: '', region: '', description: '' },
+    defaultValues: { name: '', phone: '', region: '', description: '' },
   });
 
   const availableSizes = product.sizes || ['S', 'M', 'L'];
@@ -85,10 +82,11 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   
   const paystackConfig = {
     reference: (new Date()).getTime().toString(),
-    email: addressData?.email || "customer@example.com",
+    email: "customer@example.com", // Paystack will ask for email in the popup
     amount: product.price * quantity * 100, // Amount in cents
     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
     currency: 'KES',
+    phone: addressData?.phone,
     metadata: {
       productName: product.name,
       quantity,
@@ -98,7 +96,6 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
         { display_name: "Product Name", variable_name: "product_name", value: product.name },
         { display_name: "Quantity", variable_name: "quantity", value: quantity },
         { display_name: "Size", variable_name: "size", value: selectedSize },
-        { display_name: "County", variable_name: "shipping_county", value: addressData?.county || "" },
         { display_name: "Region", variable_name: "shipping_region", value: addressData?.region || "" },
         { display_name: "Address Description", variable_name: "shipping_description", value: addressData?.description || "" }
       ]
@@ -118,9 +115,12 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
     const orderPayload = {
         products: [{ id: product.id, name: product.name, quantity, price: product.price }],
         totalAmount: product.price * quantity,
-        shippingAddress: addressData,
+        shippingAddress: {
+            region: addressData.region,
+            description: addressData.description
+        },
         customerName: addressData.name,
-        customerEmail: addressData.email,
+        customerPhone: addressData.phone,
     };
     
     try {
@@ -156,7 +156,11 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   const handleAddressSubmit = (data: AddressFormData) => {
     setAddressData(data);
     setIsAddressDialogOpen(false);
-    initializePayment({ onSuccess: onPaystackSuccess, onClose: onPaystackClose });
+    initializePayment({ 
+      onSuccess: onPaystackSuccess, 
+      onClose: onPaystackClose,
+      config: { ...paystackConfig, phone: data.phone, metadata: { ...paystackConfig.metadata, customerName: data.name } }
+    });
   };
 
   const handlePayNowClick = () => {
@@ -304,25 +308,13 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
                     <FormMessage />
                   </FormItem>
                 )}/>
-                <FormField control={addressForm.control} name="email" render={({ field }) => (
+                <FormField control={addressForm.control} name="phone" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email Address</FormLabel>
-                    <FormControl><Input type="email" placeholder="e.g., jane.doe@example.com" {...field} /></FormControl>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl><Input type="tel" placeholder="e.g., 0700000000" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}/>
-              <FormField control={addressForm.control} name="county" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>County</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Select a county" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {kenyanCounties.map(county => <SelectItem key={county} value={county}>{county}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}/>
               <FormField control={addressForm.control} name="region" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Region / Town</FormLabel>
