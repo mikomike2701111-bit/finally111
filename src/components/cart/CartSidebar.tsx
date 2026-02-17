@@ -5,7 +5,7 @@ import { useAppContext } from '@/context/AppContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { Minus, Plus, ShoppingBag, X } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, X, LoaderCircle } from 'lucide-react';
 import Link from 'next/link';
 import { usePaystackPayment } from 'react-paystack';
 import { useToast } from '@/hooks/use-toast';
@@ -18,8 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { kenyanCounties } from '@/lib/kenyan-counties';
-import { useFirestore, addDocumentNonBlocking } from '@/firebase';
-import { collection, serverTimestamp } from 'firebase/firestore';
+import { verifyPayment } from '@/ai/flows/verify-payment';
 
 const WhatsAppIcon = () => (
   <svg
@@ -45,9 +44,9 @@ export default function CartSidebar() {
   const [open, setOpen] = React.useState(false);
   const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = React.useState(false);
   const [checkoutData, setCheckoutData] = React.useState<CheckoutFormData | null>(null);
+  const [isVerifying, setIsVerifying] = React.useState(false);
   
   const { toast } = useToast();
-  const firestore = useFirestore();
 
   const checkoutForm = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutSchema),
@@ -90,13 +89,15 @@ export default function CartSidebar() {
 
   const initializePayment = usePaystackPayment(paystackConfig);
 
-  const onPaystackSuccess = (reference: any) => {
-    if (!firestore || !checkoutData) {
-      toast({ variant: "destructive", title: "Error", description: "Could not save order. Checkout details missing."});
+  const onPaystackSuccess = async (reference: any) => {
+    if (!checkoutData) {
+      toast({ variant: "destructive", title: "Error", description: "Checkout details missing. Cannot verify payment." });
       return;
     }
 
-    const orderData = {
+    setIsVerifying(true);
+    
+    const orderPayload = {
       products: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
       totalAmount: cartTotal,
       shippingAddress: {
@@ -104,20 +105,37 @@ export default function CartSidebar() {
         region: checkoutData.region,
         description: checkoutData.description,
       },
-      status: 'pending' as const,
-      createdAt: serverTimestamp(),
       customerName: checkoutData.name,
       customerEmail: checkoutData.email,
     };
 
-    addDocumentNonBlocking(collection(firestore, 'orders'), orderData);
-    
-    toast({
-        title: "Payment Successful!",
-        description: `Thank you for your purchase. Reference: ${reference.reference}`,
-    });
-    clearCart();
-    setOpen(false);
+    try {
+      const result = await verifyPayment({ reference: reference.reference, orderPayload });
+      
+      if (result.success) {
+        toast({
+            title: "Payment Successful!",
+            description: `Thank you for your purchase. Your order has been placed.`,
+        });
+        clearCart();
+        setOpen(false);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Payment Verification Failed",
+          description: result.message || "There was an issue confirming your payment. Please contact support.",
+        });
+      }
+    } catch (error) {
+       console.error("Verification flow error:", error);
+       toast({
+          variant: "destructive",
+          title: "Verification Error",
+          description: "A server error occurred while verifying your payment. Please contact support.",
+       });
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const onPaystackClose = () => {
@@ -157,6 +175,13 @@ export default function CartSidebar() {
           </Button>
         </SheetTrigger>
         <SheetContent className="w-full sm:max-w-md flex flex-col">
+          {isVerifying && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center gap-4">
+              <LoaderCircle className="w-10 h-10 animate-spin text-primary" />
+              <p className="text-lg font-semibold">Verifying your payment...</p>
+              <p className="text-sm text-muted-foreground">Please do not close this window.</p>
+            </div>
+          )}
           <SheetHeader>
             <SheetTitle>Shopping Cart ({cartCount})</SheetTitle>
           </SheetHeader>
@@ -199,15 +224,15 @@ export default function CartSidebar() {
                       <span>Ksh {cartTotal.toFixed(2)}</span>
                   </div>
                   <div className="space-y-2">
-                    <Button className="w-full" size="lg" onClick={handlePayNowClick}>
-                      Pay Now
+                    <Button className="w-full" size="lg" onClick={handlePayNowClick} disabled={isVerifying}>
+                      {isVerifying ? 'Processing...' : 'Pay Now'}
                     </Button>
-                    <Button size="lg" variant="tactile-green" className="w-full" onClick={handleCheckoutViaWhatsApp}>
+                    <Button size="lg" variant="tactile-green" className="w-full" onClick={handleCheckoutViaWhatsApp} disabled={isVerifying}>
                         <WhatsAppIcon />
                         Checkout via WhatsApp
                     </Button>
                   </div>
-                  <Button variant="outline" className="w-full" onClick={clearCart}>Clear Cart</Button>
+                  <Button variant="outline" className="w-full" onClick={clearCart} disabled={isVerifying}>Clear Cart</Button>
               </SheetFooter>
             </>
           ) : (

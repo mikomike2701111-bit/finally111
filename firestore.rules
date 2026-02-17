@@ -17,7 +17,7 @@
  * - Public Read Access: All documents are publicly readable to allow the app's front-end
  *   to function for all visitors.
  * - Authenticated Write Access: Write operations on products,
- *   categories, styles, and orders are restricted to signed-in users.
+ *   categories, and styles are restricted to signed-in users.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -50,10 +50,10 @@ service cloud.firestore {
     }
     
     match /orders/{orderId} {
-      // Allow read for authenticated users (admins).
-      allow read: if request.auth != null;
-      // Allow writes only for authenticated users (admins).
-      allow write: if request.auth != null;
+      // Allow admins to read and update orders
+      allow read, update: if request.auth != null;
+      // Disallow client-side creation and deletion of orders
+      allow create, delete: if false;
     }
   }
 }

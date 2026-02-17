@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { Product } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Minus, Plus } from 'lucide-react';
+import { Minus, Plus, LoaderCircle } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { cn } from '@/lib/utils';
 import { usePaystackPayment } from 'react-paystack';
@@ -17,8 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { kenyanCounties } from '@/lib/kenyan-counties';
-import { useFirestore, useUser, addDocumentNonBlocking } from '@/firebase';
-import { collection, serverTimestamp } from 'firebase/firestore';
+import { verifyPayment } from '@/ai/flows/verify-payment';
 
 
 interface ProductPurchaseFormProps {
@@ -38,6 +37,8 @@ const WhatsAppIcon = () => (
   );
 
 const addressSchema = z.object({
+  name: z.string().min(2, 'Name is required'),
+  email: z.string().email('A valid email is required'),
   county: z.string().min(1, 'County is required'),
   region: z.string().min(1, 'Region/Town is required'),
   description: z.string().min(1, 'Address description is required'),
@@ -53,19 +54,17 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   const [quantity, setQuantity] = useState(1);
   const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
   const [addressData, setAddressData] = useState<AddressFormData | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const isInWishlist = isProductInWishlist(product.id);
   const { toast } = useToast();
-  const firestore = useFirestore();
-  const { user } = useUser();
   
   const addressForm = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
-    defaultValues: { county: '', region: '', description: '' },
+    defaultValues: { name: '', email: '', county: '', region: '', description: '' },
   });
 
   const availableSizes = product.sizes || ['S', 'M', 'L'];
-
 
   const handleAddToCart = () => {
     addToCart(product, quantity);
@@ -86,7 +85,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   
   const paystackConfig = {
     reference: (new Date()).getTime().toString(),
-    email: "customer@example.com", // Using a placeholder email
+    email: addressData?.email || "customer@example.com",
     amount: product.price * quantity * 100, // Amount in cents
     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
     currency: 'KES',
@@ -94,6 +93,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
       productName: product.name,
       quantity,
       size: selectedSize,
+      customerName: addressData?.name || "",
       custom_fields: [
         { display_name: "Product Name", variable_name: "product_name", value: product.name },
         { display_name: "Quantity", variable_name: "quantity", value: quantity },
@@ -107,27 +107,46 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
 
   const initializePayment = usePaystackPayment(paystackConfig);
 
-  const onPaystackSuccess = (reference: any) => {
-    if (!firestore || !user || !addressData) {
-        toast({ variant: "destructive", title: "Error", description: "Could not save order. User or address missing."});
+  const onPaystackSuccess = async (reference: any) => {
+    if (!addressData) {
+        toast({ variant: "destructive", title: "Error", description: "Could not save order. Address details are missing."});
         return;
     }
     
-    const orderData = {
-        userId: user.uid,
+    setIsVerifying(true);
+
+    const orderPayload = {
         products: [{ id: product.id, name: product.name, quantity, price: product.price }],
         totalAmount: product.price * quantity,
         shippingAddress: addressData,
-        status: 'pending' as const,
-        createdAt: serverTimestamp(),
+        customerName: addressData.name,
+        customerEmail: addressData.email,
     };
     
-    addDocumentNonBlocking(collection(firestore, 'orders'), orderData);
-    
-    toast({
-        title: "Payment Successful!",
-        description: `Thank you for your purchase. Reference: ${reference.reference}`,
-    });
+    try {
+      const result = await verifyPayment({ reference: reference.reference, orderPayload });
+      if (result.success) {
+        toast({
+          title: "Payment Successful!",
+          description: "Thank you for your purchase. Your order has been placed.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Payment Verification Failed",
+          description: result.message || "There was an issue confirming your payment. Please contact support.",
+        });
+      }
+    } catch (error) {
+      console.error("Verification flow error:", error);
+      toast({
+        variant: "destructive",
+        title: "Verification Error",
+        description: "A server error occurred while verifying your payment. Please contact support.",
+      });
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const onPaystackClose = () => {
@@ -158,6 +177,12 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   return (
     <>
     <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-sm space-y-6">
+      {isVerifying && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center gap-4 rounded-2xl">
+          <LoaderCircle className="w-10 h-10 animate-spin text-primary" />
+          <p className="text-lg font-semibold">Verifying your payment...</p>
+        </div>
+      )}
       <div>
         <div className="flex justify-between items-start gap-4">
           <h1 className="text-3xl font-bold">{product.name}</h1>
@@ -247,9 +272,11 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
             <p className="text-3xl font-bold">Ksh {(product.price * quantity).toFixed(2)}</p>
         </div>
         <div className="grid grid-cols-1 gap-2">
-            <Button size="lg" className="w-full rounded-full h-12 text-base font-bold" onClick={handleAddToCart}>Add to Cart</Button>
-            <Button size="lg" variant="default" className="w-full rounded-full h-12 text-base font-bold" onClick={handlePayNowClick}>Pay Now</Button>
-            <Button size="lg" variant="tactile-green" className="w-full rounded-full h-12 text-base font-bold" onClick={handleBuyViaWhatsApp}>
+            <Button size="lg" className="w-full rounded-full h-12 text-base font-bold" onClick={handleAddToCart} disabled={isVerifying}>Add to Cart</Button>
+            <Button size="lg" variant="default" className="w-full rounded-full h-12 text-base font-bold" onClick={handlePayNowClick} disabled={isVerifying}>
+                {isVerifying ? 'Processing...' : 'Pay Now'}
+            </Button>
+            <Button size="lg" variant="tactile-green" className="w-full rounded-full h-12 text-base font-bold" onClick={handleBuyViaWhatsApp} disabled={isVerifying}>
                 <WhatsAppIcon />
                 Buy via WhatsApp
             </Button>
@@ -266,10 +293,24 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
     <Dialog open={isAddressDialogOpen} onOpenChange={setIsAddressDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Shipping Address</DialogTitle>
+            <DialogTitle>Shipping & Contact Details</DialogTitle>
           </DialogHeader>
           <Form {...addressForm}>
             <form onSubmit={addressForm.handleSubmit(handleAddressSubmit)} className="space-y-4 py-4">
+               <FormField control={addressForm.control} name="name" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl><Input placeholder="e.g., Jane Doe" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}/>
+                <FormField control={addressForm.control} name="email" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Address</FormLabel>
+                    <FormControl><Input type="email" placeholder="e.g., jane.doe@example.com" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}/>
               <FormField control={addressForm.control} name="county" render={({ field }) => (
                 <FormItem>
                   <FormLabel>County</FormLabel>
