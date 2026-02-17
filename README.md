@@ -10,7 +10,7 @@ To get started, take a look at `src/app/page.tsx`.
 
 Follow these commands precisely in your terminal to push your project to your GitHub repository.
 
-**Target Repository:** `https://github.com/mikomikE254254/finally`
+**Target Repository:** `https://github.com/mikomikE254254/finally111.git`
 
 ### Terminal Commands: Step-by-Step Guide
 
@@ -38,7 +38,7 @@ git commit -m "Initial commit from Firebase Studio"
 **5. Set your GitHub repository as the remote**
 This command links your local project to the one on GitHub. It will fix any previous incorrect URLs.
 ```sh
-git remote set-url origin https://github.com/mikomikE254254/finally.git
+git remote set-url origin https://github.com/mikomikE254254/finally111.git
 ```
 
 **6. Set your main branch name**
@@ -79,7 +79,6 @@ When you run `git push`, the terminal will ask for your **Username** and **Passw
 
 - **Fails WITHOUT asking for a password**: This means your computer has saved the wrong credentials. Run the command below to force it to ask you for a password again. When it does, paste your **Personal Access Token**.
   ```sh
-  git push https://mikomikE254254@github.com/mikomikE254254/finally.git main
+  git push https://mikomikE254254@github.com/mikomikE254254/finally111.git main
   ```
-# finally
 # finally111
