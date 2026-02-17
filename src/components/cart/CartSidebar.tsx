@@ -76,9 +76,8 @@ export default function CartSidebar() {
   };
   
   const handleCheckoutSubmit = (data: CheckoutFormData) => {
-    setIsCheckoutDialogOpen(false);
-
     const onPaymentSuccess = async (reference: any) => {
+      setIsCheckoutDialogOpen(false);
       setIsVerifying(true);
       const orderPayload = {
         products: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
@@ -118,8 +117,7 @@ export default function CartSidebar() {
     };
 
     const onPaymentClose = () => {
-        // This is called when the user closes the pop-up.
-        // Can be left silent.
+        setIsCheckoutDialogOpen(false);
     };
     
     const config = {

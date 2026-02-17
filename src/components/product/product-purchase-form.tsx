@@ -92,9 +92,8 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   };
 
   const handleAddressSubmit = (data: AddressFormData) => {
-    setIsAddressDialogOpen(false);
-
     const onPaymentSuccess = async (reference: any) => {
+      setIsAddressDialogOpen(false);
       setIsVerifying(true);
       const orderPayload = {
           products: [{ id: product.id, name: product.name, quantity, price: product.price }],
@@ -131,8 +130,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
     };
 
     const onPaymentClose = () => {
-      // This is called when the user closes the pop-up.
-      // Can be left silent.
+      setIsAddressDialogOpen(false);
     };
     
     const config = {
