@@ -35,20 +35,139 @@ const checkoutSchema = z.object({
 });
 type CheckoutFormData = z.infer<typeof checkoutSchema>;
 
-export default function CartSidebar() {
-  const { cart, removeFromCart, updateQuantity, cartCount, cartTotal, clearCart } = useAppContext();
-  const [open, setOpen] = React.useState(false);
+function CheckoutDialog() {
+  const { cart, cartCount, cartTotal, clearCart, setOpen: setCartOpen } = useAppContext();
   const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = React.useState(false);
   const [isVerifying, setIsVerifying] = React.useState(false);
-  
   const { toast } = useToast();
-  const initializePayment = usePaystackPayment();
 
   const checkoutForm = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: { name: '', phone: '', description: '' },
+    mode: 'onChange',
   });
 
+  const watchedPhone = checkoutForm.watch('phone');
+  const watchedName = checkoutForm.watch('name');
+  const watchedDescription = checkoutForm.watch('description');
+
+  const config = React.useMemo(() => ({
+    reference: (new Date()).getTime().toString(),
+    email: "customer@example.com",
+    amount: cartTotal * 100,
+    publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
+    currency: 'KES',
+    phone: watchedPhone,
+    metadata: {
+        cartItems: cart.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })),
+        total: cartTotal,
+        customerName: watchedName,
+        custom_fields: [
+          { display_name: "Cart Total", variable_name: "cart_total", value: `Ksh ${cartTotal.toFixed(2)}`},
+          { display_name: "Number of Items", variable_name: "number_of_items", value: cartCount },
+          { display_name: "Address Description", variable_name: watchedDescription }
+        ]
+    }
+  }), [cart, cartTotal, cartCount, watchedPhone, watchedName, watchedDescription]);
+
+  const initializePayment = usePaystackPayment(config);
+
+  const onPaymentSuccess = async (reference: any) => {
+    setIsVerifying(true);
+    const orderPayload = {
+      products: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
+      totalAmount: cartTotal,
+      shippingAddress: { description: watchedDescription },
+      customerName: watchedName,
+      customerPhone: watchedPhone,
+    };
+    try {
+      const result = await verifyPayment({ reference: reference.reference, orderPayload });
+      if (result.success) {
+        toast({ title: "Payment Successful!", description: "Thank you for your purchase. Your order has been placed." });
+        clearCart();
+        setCartOpen(false);
+      } else {
+        toast({ variant: "destructive", title: "Payment Verification Failed", description: result.message || "Please contact support." });
+      }
+    } catch (error) {
+      console.error("Verification flow error:", error);
+      toast({ variant: "destructive", title: "Verification Error", description: "A server error occurred. Please contact support." });
+    } finally {
+      setIsVerifying(false);
+      setIsCheckoutDialogOpen(false);
+    }
+  };
+
+  const onPaymentClose = () => {
+    setIsCheckoutDialogOpen(true); // Keep it open if user closes paystack popup
+  };
+
+  const handleCheckoutSubmit = () => {
+    initializePayment(onPaymentSuccess, onPaymentClose);
+  };
+  
+  const handlePayNowClick = () => {
+    if (cart.length === 0) {
+      toast({ variant: "destructive", title: "Cart is Empty", description: "Please add items to your cart." });
+      return;
+    }
+    if (!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) {
+      toast({ variant: "destructive", title: "Configuration Error", description: "Payment gateway is not configured." });
+      return;
+    }
+    setIsCheckoutDialogOpen(true);
+  };
+
+  return (
+    <>
+      <Button className="w-full" size="lg" onClick={handlePayNowClick} disabled={isVerifying}>
+        {isVerifying ? 'Processing...' : 'Pay Now'}
+      </Button>
+      <Dialog open={isCheckoutDialogOpen} onOpenChange={setIsCheckoutDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Checkout Details</DialogTitle>
+          </DialogHeader>
+          <Form {...checkoutForm}>
+            <form onSubmit={checkoutForm.handleSubmit(handleCheckoutSubmit)} className="space-y-4 py-4">
+                <FormField control={checkoutForm.control} name="name" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl><Input placeholder="e.g., Jane Doe" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}/>
+                <FormField control={checkoutForm.control} name="phone" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl><Input type="tel" placeholder="e.g., 0700000000" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}/>
+              <FormField control={checkoutForm.control} name="description" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address Description</FormLabel>
+                  <FormControl><Textarea placeholder="e.g., Building name, street, house number" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}/>
+              <DialogFooter>
+                <Button type="submit" disabled={!checkoutForm.formState.isValid}>Proceed to Payment</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+
+export default function CartSidebar() {
+  const { cart, removeFromCart, updateQuantity, cartCount, cartTotal, clearCart, open, setOpen } = useAppContext();
+  const [isVerifying, setIsVerifying] = React.useState(false);
+  
   const handleCheckoutViaWhatsApp = () => {
     if (cart.length === 0) return;
 
@@ -62,89 +181,6 @@ export default function CartSidebar() {
     const whatsappUrl = `https://wa.me/254740685488?text=${encodedMessage}`;
     window.open(whatsappUrl, '_blank');
   };
-
-  const handlePayNowClick = () => {
-    if (cart.length === 0) {
-      toast({ variant: "destructive", title: "Cart is Empty", description: "Please add items to your cart." });
-      return;
-    }
-    if (!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) {
-      toast({ variant: "destructive", title: "Configuration Error", description: "Payment gateway is not configured." });
-      return;
-    }
-    setIsCheckoutDialogOpen(true);
-  };
-  
-  const handleCheckoutSubmit = (data: CheckoutFormData) => {
-    const onPaymentSuccess = async (reference: any) => {
-      setIsCheckoutDialogOpen(false);
-      setIsVerifying(true);
-      const orderPayload = {
-        products: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
-        totalAmount: cartTotal,
-        shippingAddress: { description: data.description },
-        customerName: data.name,
-        customerPhone: data.phone,
-      };
-
-      try {
-        const result = await verifyPayment({ reference: reference.reference, orderPayload });
-        
-        if (result.success) {
-          toast({
-              title: "Payment Successful!",
-              description: `Thank you for your purchase. Your order has been placed.`,
-          });
-          clearCart();
-          setOpen(false);
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Payment Verification Failed",
-            description: result.message || "There was an issue confirming your payment. Please contact support.",
-          });
-        }
-      } catch (error) {
-         console.error("Verification flow error:", error);
-         toast({
-            variant: "destructive",
-            title: "Verification Error",
-            description: "A server error occurred while verifying your payment. Please contact support.",
-         });
-      } finally {
-        setIsVerifying(false);
-      }
-    };
-
-    const onPaymentClose = () => {
-        setIsCheckoutDialogOpen(false);
-    };
-    
-    const config = {
-      reference: (new Date()).getTime().toString(),
-      email: "customer@example.com", // Paystack's popup will ask for email if not provided here.
-      amount: cartTotal * 100, // Amount in kobo/cents
-      publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
-      currency: 'KES',
-      phone: data.phone,
-      metadata: {
-        cartItems: cart.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })),
-        total: cartTotal,
-        customerName: data.name,
-        custom_fields: [
-          { display_name: "Cart Total", variable_name: "cart_total", value: `Ksh ${cartTotal.toFixed(2)}`},
-          { display_name: "Number of Items", variable_name: "number_of_items", value: cartCount },
-          { display_name: "Address Description", variable_name: "shipping_description", value: data.description }
-        ]
-      }
-    };
-
-    initializePayment({ 
-        onSuccess: onPaymentSuccess, 
-        onClose: onPaymentClose,
-        config: config
-    });
-  }
 
   return (
     <>
@@ -210,9 +246,7 @@ export default function CartSidebar() {
                       <span>Ksh {cartTotal.toFixed(2)}</span>
                   </div>
                   <div className="space-y-2">
-                    <Button className="w-full" size="lg" onClick={handlePayNowClick} disabled={isVerifying}>
-                      {isVerifying ? 'Processing...' : 'Pay Now'}
-                    </Button>
+                    <CheckoutDialog />
                     <Button size="lg" variant="tactile-green" className="w-full" onClick={handleCheckoutViaWhatsApp} disabled={isVerifying}>
                         <WhatsAppIcon />
                         Checkout via WhatsApp
@@ -230,42 +264,6 @@ export default function CartSidebar() {
           )}
         </SheetContent>
       </Sheet>
-      
-      <Dialog open={isCheckoutDialogOpen} onOpenChange={setIsCheckoutDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Checkout Details</DialogTitle>
-          </DialogHeader>
-          <Form {...checkoutForm}>
-            <form onSubmit={checkoutForm.handleSubmit(handleCheckoutSubmit)} className="space-y-4 py-4">
-                <FormField control={checkoutForm.control} name="name" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl><Input placeholder="e.g., Jane Doe" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}/>
-                <FormField control={checkoutForm.control} name="phone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl><Input type="tel" placeholder="e.g., 0700000000" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}/>
-              <FormField control={checkoutForm.control} name="description" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Address Description</FormLabel>
-                  <FormControl><Textarea placeholder="e.g., Building name, street, house number" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}/>
-              <DialogFooter>
-                <Button type="submit">Proceed to Payment</Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

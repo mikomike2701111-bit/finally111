@@ -19,6 +19,8 @@ interface AppContextType {
   cartCount: number;
   cartTotal: number;
   clearCart: () => void;
+  open: boolean;
+  setOpen: (open: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -27,6 +29,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
+  const [open, setOpen] = useState(false); // For cart sidebar
 
   // Load cart and wishlist from localStorage on initial render
   useEffect(() => {
@@ -138,6 +141,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       cartCount,
       cartTotal,
       clearCart,
+      open,
+      setOpen
     }}>
       {children}
     </AppContext.Provider>

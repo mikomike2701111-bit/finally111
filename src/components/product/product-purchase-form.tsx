@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Product } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Minus, Plus, LoaderCircle } from 'lucide-react';
@@ -53,12 +53,39 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
 
   const isInWishlist = isProductInWishlist(product.id);
   const { toast } = useToast();
-  const initializePayment = usePaystackPayment();
   
   const addressForm = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
     defaultValues: { name: '', phone: '', description: '' },
+    mode: 'onChange',
   });
+
+  const watchedPhone = addressForm.watch('phone');
+  const watchedName = addressForm.watch('name');
+  const watchedDescription = addressForm.watch('description');
+  
+  const config = useMemo(() => ({
+    reference: (new Date()).getTime().toString(),
+    email: "customer@example.com",
+    amount: product.price * quantity * 100,
+    publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
+    currency: 'KES',
+    phone: watchedPhone,
+    metadata: {
+      productName: product.name,
+      quantity,
+      size: selectedSize,
+      customerName: watchedName,
+      custom_fields: [
+        { display_name: "Product Name", variable_name: "product_name", value: product.name },
+        { display_name: "Quantity", variable_name: "quantity", value: quantity },
+        { display_name: "Size", variable_name: "size", value: selectedSize },
+        { display_name: "Address Description", variable_name: "shipping_description", value: watchedDescription }
+      ]
+    }
+  }), [product, quantity, selectedSize, watchedPhone, watchedName, watchedDescription]);
+
+  const initializePayment = usePaystackPayment(config);
 
   const availableSizes = product.sizes || ['S', 'M', 'L'];
 
@@ -91,74 +118,37 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
       setIsAddressDialogOpen(true);
   };
 
-  const handleAddressSubmit = (data: AddressFormData) => {
-    const onPaymentSuccess = async (reference: any) => {
-      setIsAddressDialogOpen(false);
-      setIsVerifying(true);
-      const orderPayload = {
-          products: [{ id: product.id, name: product.name, quantity, price: product.price }],
-          totalAmount: product.price * quantity,
-          shippingAddress: { description: data.description },
-          customerName: data.name,
-          customerPhone: data.phone,
-      };
-      
-      try {
-        const result = await verifyPayment({ reference: reference.reference, orderPayload });
-        if (result.success) {
-          toast({
-            title: "Payment Successful!",
-            description: "Thank you for your purchase. Your order has been placed.",
-          });
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Payment Verification Failed",
-            description: result.message || "There was an issue confirming your payment. Please contact support.",
-          });
-        }
-      } catch (error) {
-        console.error("Verification flow error:", error);
-        toast({
-          variant: "destructive",
-          title: "Verification Error",
-          description: "A server error occurred while verifying your payment. Please contact support.",
-        });
-      } finally {
-        setIsVerifying(false);
+  const onPaymentSuccess = async (reference: any) => {
+    setIsVerifying(true);
+    const orderPayload = {
+      products: [{ id: product.id, name: product.name, quantity, price: product.price }],
+      totalAmount: product.price * quantity,
+      shippingAddress: { description: watchedDescription },
+      customerName: watchedName,
+      customerPhone: watchedPhone,
+    };
+    try {
+      const result = await verifyPayment({ reference: reference.reference, orderPayload });
+      if (result.success) {
+        toast({ title: "Payment Successful!", description: "Thank you for your purchase. Your order has been placed." });
+      } else {
+        toast({ variant: "destructive", title: "Payment Verification Failed", description: result.message || "Please contact support." });
       }
-    };
-
-    const onPaymentClose = () => {
+    } catch (error) {
+      console.error("Verification flow error:", error);
+      toast({ variant: "destructive", title: "Verification Error", description: "A server error occurred. Please contact support." });
+    } finally {
+      setIsVerifying(false);
       setIsAddressDialogOpen(false);
-    };
-    
-    const config = {
-      reference: (new Date()).getTime().toString(),
-      email: "customer@example.com", // Paystack's popup will ask for email if not provided here.
-      amount: product.price * quantity * 100, // Amount in kobo/cents
-      publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
-      currency: 'KES',
-      phone: data.phone,
-      metadata: {
-        productName: product.name,
-        quantity,
-        size: selectedSize,
-        customerName: data.name,
-        custom_fields: [
-          { display_name: "Product Name", variable_name: "product_name", value: product.name },
-          { display_name: "Quantity", variable_name: "quantity", value: quantity },
-          { display_name: "Size", variable_name: "size", value: selectedSize },
-          { display_name: "Address Description", variable_name: "shipping_description", value: data.description }
-        ]
-      }
-    };
+    }
+  };
 
-    initializePayment({ 
-      onSuccess: onPaymentSuccess, 
-      onClose: onPaymentClose,
-      config: config
-    });
+  const onPaymentClose = () => {
+    setIsAddressDialogOpen(true); // Keep dialog open if user closes paystack
+  };
+  
+  const handleAddressSubmit = () => {
+    initializePayment(onPaymentSuccess, onPaymentClose);
   };
 
   const colorOptions = product.availableColors || fallbackColors.map(hex => ({ name: hex, hex }));
@@ -308,7 +298,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
                 </FormItem>
               )}/>
               <DialogFooter>
-                <Button type="submit">Proceed to Payment</Button>
+                <Button type="submit" disabled={!addressForm.formState.isValid}>Proceed to Payment</Button>
               </DialogFooter>
             </form>
           </Form>
