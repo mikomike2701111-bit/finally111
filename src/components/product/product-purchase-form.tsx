@@ -49,11 +49,11 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   const [selectedSize, setSelectedSize] = useState('M');
   const [quantity, setQuantity] = useState(1);
   const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
-  const [addressData, setAddressData] = useState<AddressFormData | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
 
   const isInWishlist = isProductInWishlist(product.id);
   const { toast } = useToast();
+  const initializePayment = usePaystackPayment();
   
   const addressForm = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
@@ -79,101 +79,91 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
     window.open(whatsappUrl, '_blank');
   };
   
-  const paystackConfig = {
-    reference: (new Date()).getTime().toString(),
-    email: "customer@example.com", // Paystack will ask for email in the popup
-    amount: product.price * quantity * 100, // Amount in cents
-    publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
-    currency: 'KES',
-    phone: addressData?.phone,
-    metadata: {
-      productName: product.name,
-      quantity,
-      size: selectedSize,
-      customerName: addressData?.name || "",
-      custom_fields: [
-        { display_name: "Product Name", variable_name: "product_name", value: product.name },
-        { display_name: "Quantity", variable_name: "quantity", value: quantity },
-        { display_name: "Size", variable_name: "size", value: selectedSize },
-        { display_name: "Address Description", variable_name: "shipping_description", value: addressData?.description || "" }
-      ]
-    }
-  };
-
-  const initializePayment = usePaystackPayment(paystackConfig);
-
-  const onPaystackSuccess = async (reference: any) => {
-    if (!addressData) {
-        toast({ variant: "destructive", title: "Error", description: "Could not save order. Address details are missing."});
-        return;
-    }
-    
-    setIsVerifying(true);
-
-    const orderPayload = {
-        products: [{ id: product.id, name: product.name, quantity, price: product.price }],
-        totalAmount: product.price * quantity,
-        shippingAddress: {
-            description: addressData.description
-        },
-        customerName: addressData.name,
-        customerPhone: addressData.phone,
-    };
-    
-    try {
-      const result = await verifyPayment({ reference: reference.reference, orderPayload });
-      if (result.success) {
-        toast({
-          title: "Payment Successful!",
-          description: "Thank you for your purchase. Your order has been placed.",
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Payment Verification Failed",
-          description: result.message || "There was an issue confirming your payment. Please contact support.",
-        });
-      }
-    } catch (error) {
-      console.error("Verification flow error:", error);
-      toast({
-        variant: "destructive",
-        title: "Verification Error",
-        description: "A server error occurred while verifying your payment. Please contact support.",
-      });
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const onPaystackClose = () => {
-      // Silent on close as it's triggered on success as well.
-  };
-
-  const handleAddressSubmit = (data: AddressFormData) => {
-    setAddressData(data);
-    setIsAddressDialogOpen(false);
-    initializePayment({ 
-      onSuccess: onPaystackSuccess, 
-      onClose: onPaystackClose,
-      config: { ...paystackConfig, phone: data.phone, metadata: { ...paystackConfig.metadata, customerName: data.name } }
-    });
-  };
-
   const handlePayNowClick = () => {
       if (!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) {
           toast({
               variant: "destructive",
               title: "Configuration Error",
-              description: "Paystack payment is not configured correctly."
+              description: "Payment gateway is not configured correctly."
           });
           return;
       }
       setIsAddressDialogOpen(true);
   };
 
-  const colorOptions = product.availableColors || fallbackColors.map(hex => ({ name: hex, hex }));
+  const handleAddressSubmit = (data: AddressFormData) => {
+    setIsAddressDialogOpen(false);
 
+    const onPaymentSuccess = async (reference: any) => {
+      setIsVerifying(true);
+      const orderPayload = {
+          products: [{ id: product.id, name: product.name, quantity, price: product.price }],
+          totalAmount: product.price * quantity,
+          shippingAddress: { description: data.description },
+          customerName: data.name,
+          customerPhone: data.phone,
+      };
+      
+      try {
+        const result = await verifyPayment({ reference: reference.reference, orderPayload });
+        if (result.success) {
+          toast({
+            title: "Payment Successful!",
+            description: "Thank you for your purchase. Your order has been placed.",
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Payment Verification Failed",
+            description: result.message || "There was an issue confirming your payment. Please contact support.",
+          });
+        }
+      } catch (error) {
+        console.error("Verification flow error:", error);
+        toast({
+          variant: "destructive",
+          title: "Verification Error",
+          description: "A server error occurred while verifying your payment. Please contact support.",
+        });
+      } finally {
+        setIsVerifying(false);
+      }
+    };
+
+    const onPaymentClose = () => {
+      // This is called when the user closes the pop-up.
+      // Can be left silent.
+    };
+    
+    const config = {
+      reference: (new Date()).getTime().toString(),
+      email: "customer@example.com", // Paystack's popup will ask for email if not provided here.
+      amount: product.price * quantity * 100, // Amount in kobo/cents
+      publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
+      currency: 'KES',
+      phone: data.phone,
+      metadata: {
+        productName: product.name,
+        quantity,
+        size: selectedSize,
+        customerName: data.name,
+        custom_fields: [
+          { display_name: "Product Name", variable_name: "product_name", value: product.name },
+          { display_name: "Quantity", variable_name: "quantity", value: quantity },
+          { display_name: "Size", variable_name: "size", value: selectedSize },
+          { display_name: "Address Description", variable_name: "shipping_description", value: data.description }
+        ]
+      }
+    };
+
+    initializePayment({ 
+      onSuccess: onPaymentSuccess, 
+      onClose: onPaymentClose,
+      config: config
+    });
+  };
+
+  const colorOptions = product.availableColors || fallbackColors.map(hex => ({ name: hex, hex }));
 
   return (
     <>

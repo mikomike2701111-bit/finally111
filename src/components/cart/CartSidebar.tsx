@@ -39,10 +39,10 @@ export default function CartSidebar() {
   const { cart, removeFromCart, updateQuantity, cartCount, cartTotal, clearCart } = useAppContext();
   const [open, setOpen] = React.useState(false);
   const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = React.useState(false);
-  const [checkoutData, setCheckoutData] = React.useState<CheckoutFormData | null>(null);
   const [isVerifying, setIsVerifying] = React.useState(false);
   
   const { toast } = useToast();
+  const initializePayment = usePaystackPayment();
 
   const checkoutForm = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutSchema),
@@ -63,89 +63,6 @@ export default function CartSidebar() {
     window.open(whatsappUrl, '_blank');
   };
 
-  const paystackConfig = {
-    reference: (new Date()).getTime().toString(),
-    email: "customer@example.com", // Paystack will ask for email in the popup
-    amount: cartTotal * 100, // Amount in cents
-    publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
-    currency: 'KES',
-    phone: checkoutData?.phone,
-    metadata: {
-      cartItems: cart.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })),
-      total: cartTotal,
-      customerName: checkoutData?.name || "",
-      custom_fields: [
-        { display_name: "Cart Total", variable_name: "cart_total", value: `Ksh ${cartTotal.toFixed(2)}`},
-        { display_name: "Number of Items", variable_name: "number_of_items", value: cartCount },
-        { display_name: "Address Description", variable_name: "shipping_description", value: checkoutData?.description || "" }
-      ]
-    }
-  };
-
-  const initializePayment = usePaystackPayment(paystackConfig);
-
-  const onPaystackSuccess = async (reference: any) => {
-    if (!checkoutData) {
-      toast({ variant: "destructive", title: "Error", description: "Checkout details missing. Cannot verify payment." });
-      return;
-    }
-
-    setIsVerifying(true);
-    
-    const orderPayload = {
-      products: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
-      totalAmount: cartTotal,
-      shippingAddress: {
-        description: checkoutData.description,
-      },
-      customerName: checkoutData.name,
-      customerPhone: checkoutData.phone,
-    };
-
-    try {
-      const result = await verifyPayment({ reference: reference.reference, orderPayload });
-      
-      if (result.success) {
-        toast({
-            title: "Payment Successful!",
-            description: `Thank you for your purchase. Your order has been placed.`,
-        });
-        clearCart();
-        setOpen(false);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Payment Verification Failed",
-          description: result.message || "There was an issue confirming your payment. Please contact support.",
-        });
-      }
-    } catch (error) {
-       console.error("Verification flow error:", error);
-       toast({
-          variant: "destructive",
-          title: "Verification Error",
-          description: "A server error occurred while verifying your payment. Please contact support.",
-       });
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const onPaystackClose = () => {
-      // silent on close
-  };
-  
-  const handleCheckoutSubmit = (data: CheckoutFormData) => {
-    setCheckoutData(data);
-    setIsCheckoutDialogOpen(false);
-    // We update the config right before calling, to ensure latest data is used
-    initializePayment({ 
-        onSuccess: onPaystackSuccess, 
-        onClose: onPaystackClose,
-        config: { ...paystackConfig, phone: data.phone, metadata: { ...paystackConfig.metadata, customerName: data.name } }
-    });
-  }
-
   const handlePayNowClick = () => {
     if (cart.length === 0) {
       toast({ variant: "destructive", title: "Cart is Empty", description: "Please add items to your cart." });
@@ -157,6 +74,79 @@ export default function CartSidebar() {
     }
     setIsCheckoutDialogOpen(true);
   };
+  
+  const handleCheckoutSubmit = (data: CheckoutFormData) => {
+    setIsCheckoutDialogOpen(false);
+
+    const onPaymentSuccess = async (reference: any) => {
+      setIsVerifying(true);
+      const orderPayload = {
+        products: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
+        totalAmount: cartTotal,
+        shippingAddress: { description: data.description },
+        customerName: data.name,
+        customerPhone: data.phone,
+      };
+
+      try {
+        const result = await verifyPayment({ reference: reference.reference, orderPayload });
+        
+        if (result.success) {
+          toast({
+              title: "Payment Successful!",
+              description: `Thank you for your purchase. Your order has been placed.`,
+          });
+          clearCart();
+          setOpen(false);
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Payment Verification Failed",
+            description: result.message || "There was an issue confirming your payment. Please contact support.",
+          });
+        }
+      } catch (error) {
+         console.error("Verification flow error:", error);
+         toast({
+            variant: "destructive",
+            title: "Verification Error",
+            description: "A server error occurred while verifying your payment. Please contact support.",
+         });
+      } finally {
+        setIsVerifying(false);
+      }
+    };
+
+    const onPaymentClose = () => {
+        // This is called when the user closes the pop-up.
+        // Can be left silent.
+    };
+    
+    const config = {
+      reference: (new Date()).getTime().toString(),
+      email: "customer@example.com", // Paystack's popup will ask for email if not provided here.
+      amount: cartTotal * 100, // Amount in kobo/cents
+      publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
+      currency: 'KES',
+      phone: data.phone,
+      metadata: {
+        cartItems: cart.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })),
+        total: cartTotal,
+        customerName: data.name,
+        custom_fields: [
+          { display_name: "Cart Total", variable_name: "cart_total", value: `Ksh ${cartTotal.toFixed(2)}`},
+          { display_name: "Number of Items", variable_name: "number_of_items", value: cartCount },
+          { display_name: "Address Description", variable_name: "shipping_description", value: data.description }
+        ]
+      }
+    };
+
+    initializePayment({ 
+        onSuccess: onPaymentSuccess, 
+        onClose: onPaymentClose,
+        config: config
+    });
+  }
 
   return (
     <>
