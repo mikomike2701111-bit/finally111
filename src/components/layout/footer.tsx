@@ -1,13 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { Facebook, Twitter, Instagram, Linkedin, Phone, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Footer() {
-  const pathname = usePathname();
-
   return (
     <footer className="bg-background text-black py-12 px-6 sm:px-12 lg:px-20">
       <div className="space-y-6 max-w-7xl mx-auto">
@@ -23,14 +20,12 @@ export default function Footer() {
               <Link href="/unisex" className="hover:underline">Unisex</Link>
               <Link href="/bags" className="hover:underline">Bags</Link>
             </nav>
-            {pathname === '/bags' && (
-              <Button asChild variant="secondary" size="sm">
-                <Link href="/admin-dashboard">
-                  <Settings />
-                  Admin
-                </Link>
-              </Button>
-            )}
+            <Button asChild variant="secondary" size="sm">
+              <Link href="/admin-dashboard">
+                <Settings />
+                Admin
+              </Link>
+            </Button>
           </div>
         </div>
 
@@ -47,7 +42,7 @@ export default function Footer() {
 
         {/* Bottom Segment */}
         <div className="bg-white p-4 flex flex-col sm:flex-row justify-between items-center gap-4 border-2 border-black rounded-2xl">
-          <p className="text-xs text-gray-600">© 2026 Eddjos.ke. All rights reserved.</p>
+          <p className="text-xs text-gray-600">© {new Date().getFullYear()} Eddjos.ke. All rights reserved.</p>
           
           <Button asChild variant="secondary" size="icon" className="rounded-full">
               <Link href="/contact" aria-label="Contact page">
@@ -66,5 +61,3 @@ export default function Footer() {
     </footer>
   );
 }
-
-    
