@@ -45,13 +45,13 @@ export default function ProductPage() {
         setTimeout(() => {
           setPrimaryImage(newImage);
           setIsImageFading(false);
-        }, 1500);
+        }, 300);
       } else if (!newImage && product.images[0] && primaryImage?.url !== product.images[0].url) {
         setIsImageFading(true);
         setTimeout(() => {
           setPrimaryImage(product.images[0]);
           setIsImageFading(false);
-        }, 1500);
+        }, 300);
       }
     } else if (product && !primaryImage && product.images[0]) {
       setPrimaryImage(product.images[0]);
@@ -71,7 +71,7 @@ export default function ProductPage() {
           }
         }
         setIsImageFading(false);
-    }, 1500);
+    }, 300);
   };
   
   if (isLoading) {
@@ -87,13 +87,47 @@ export default function ProductPage() {
                         <Skeleton className="aspect-square w-full rounded-lg" />
                     </div>
                 </div>
-                <div className="space-y-6">
-                    <Skeleton className="h-10 w-3/4" />
-                    <Skeleton className="h-6 w-1/4" />
-                    <Skeleton className="h-24 w-full" />
-                    <Skeleton className="h-12 w-full rounded-full" />
-                    <Skeleton className="h-12 w-full rounded-full" />
-                </div>
+                <div className="space-y-8">
+                  <div className="space-y-2">
+                      <Skeleton className="h-10 w-3/4" />
+                      <Skeleton className="h-6 w-1/4" />
+                  </div>
+                  <div className="space-y-4">
+                      <div>
+                          <Skeleton className="h-4 w-12 mb-2" />
+                          <div className="flex gap-2">
+                              <Skeleton className="h-8 w-8 rounded-full" />
+                              <Skeleton className="h-8 w-8 rounded-full" />
+                              <Skeleton className="h-8 w-8 rounded-full" />
+                          </div>
+                      </div>
+                      <div>
+                          <Skeleton className="h-4 w-12 mb-2" />
+                          <div className="flex gap-2">
+                              <Skeleton className="h-10 w-16 rounded-full" />
+                              <Skeleton className="h-10 w-16 rounded-full" />
+                              <Skeleton className="h-10 w-16 rounded-full" />
+                          </div>
+                      </div>
+                  </div>
+                  <div className="border-t pt-6 space-y-4">
+                      <div className="flex justify-between items-center">
+                          <Skeleton className="h-6 w-1/3" />
+                          <Skeleton className="h-10 w-1/2" />
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                          <Skeleton className="h-12 w-full rounded-full" />
+                          <Skeleton className="h-12 w-full rounded-full" />
+                          <Skeleton className="h-12 w-full rounded-full" />
+                      </div>
+                  </div>
+                  <div className="space-y-2">
+                      <Skeleton className="h-6 w-1/4" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-5/6" />
+                  </div>
+              </div>
             </div>
         </div>
     )
@@ -130,7 +164,7 @@ export default function ProductPage() {
                   alt={primaryImage.alt}
                   fill
                   className={cn(
-                    "object-cover transition-opacity ease-in-out duration-[1500ms]",
+                    "object-cover transition-opacity ease-in-out duration-300",
                     isImageFading ? "opacity-0" : "opacity-100"
                   )}
                   sizes="(max-width: 1024px) 100vw, 50vw"
