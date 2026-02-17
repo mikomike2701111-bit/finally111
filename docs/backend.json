@@ -160,10 +160,9 @@
         "shippingAddress": {
           "type": "object",
           "properties": {
-            "region": { "type": "string" },
             "description": { "type": "string" }
           },
-          "required": ["description", "region"]
+          "required": ["description"]
         },
         "status": {
           "type": "string",

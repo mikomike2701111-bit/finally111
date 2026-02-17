@@ -41,7 +41,6 @@ export type Order = {
   }[];
   totalAmount: number;
   shippingAddress: {
-    region: string;
     description: string;
   };
   status: 'pending' | 'shipped' | 'delivered' | 'cancelled';

@@ -529,7 +529,7 @@ function DashboardContent() {
                   </TableCell>
                   <TableCell>Ksh {order.totalAmount.toFixed(2)}</TableCell>
                   <TableCell className="text-xs">
-                      {order.shippingAddress.description},<br/>{order.shippingAddress.region}
+                      {order.shippingAddress.description}
                   </TableCell>
                   <TableCell className="text-right">
                     <Select

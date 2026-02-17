@@ -31,7 +31,6 @@ const WhatsAppIcon = () => (
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   phone: z.string().min(10, 'A valid phone number is required'),
-  region: z.string().min(1, 'Region/Town is required'),
   description: z.string().min(1, 'Address description is required'),
 });
 type CheckoutFormData = z.infer<typeof checkoutSchema>;
@@ -47,7 +46,7 @@ export default function CartSidebar() {
 
   const checkoutForm = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutSchema),
-    defaultValues: { name: '', phone: '', region: '', description: '' },
+    defaultValues: { name: '', phone: '', description: '' },
   });
 
   const handleCheckoutViaWhatsApp = () => {
@@ -78,7 +77,6 @@ export default function CartSidebar() {
       custom_fields: [
         { display_name: "Cart Total", variable_name: "cart_total", value: `Ksh ${cartTotal.toFixed(2)}`},
         { display_name: "Number of Items", variable_name: "number_of_items", value: cartCount },
-        { display_name: "Region", variable_name: "shipping_region", value: checkoutData?.region || "" },
         { display_name: "Address Description", variable_name: "shipping_description", value: checkoutData?.description || "" }
       ]
     }
@@ -98,7 +96,6 @@ export default function CartSidebar() {
       products: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
       totalAmount: cartTotal,
       shippingAddress: {
-        region: checkoutData.region,
         description: checkoutData.description,
       },
       customerName: checkoutData.name,
@@ -267,13 +264,6 @@ export default function CartSidebar() {
                     <FormMessage />
                   </FormItem>
                 )}/>
-              <FormField control={checkoutForm.control} name="region" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Region / Town</FormLabel>
-                  <FormControl><Input placeholder="e.g., Westlands" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}/>
               <FormField control={checkoutForm.control} name="description" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Address Description</FormLabel>

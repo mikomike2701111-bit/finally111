@@ -37,7 +37,6 @@ const WhatsAppIcon = () => (
 const addressSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   phone: z.string().min(10, 'A valid phone number is required'),
-  region: z.string().min(1, 'Region/Town is required'),
   description: z.string().min(1, 'Address description is required'),
 });
 type AddressFormData = z.infer<typeof addressSchema>;
@@ -58,7 +57,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   
   const addressForm = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
-    defaultValues: { name: '', phone: '', region: '', description: '' },
+    defaultValues: { name: '', phone: '', description: '' },
   });
 
   const availableSizes = product.sizes || ['S', 'M', 'L'];
@@ -96,7 +95,6 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
         { display_name: "Product Name", variable_name: "product_name", value: product.name },
         { display_name: "Quantity", variable_name: "quantity", value: quantity },
         { display_name: "Size", variable_name: "size", value: selectedSize },
-        { display_name: "Region", variable_name: "shipping_region", value: addressData?.region || "" },
         { display_name: "Address Description", variable_name: "shipping_description", value: addressData?.description || "" }
       ]
     }
@@ -116,7 +114,6 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
         products: [{ id: product.id, name: product.name, quantity, price: product.price }],
         totalAmount: product.price * quantity,
         shippingAddress: {
-            region: addressData.region,
             description: addressData.description
         },
         customerName: addressData.name,
@@ -315,13 +312,6 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
                     <FormMessage />
                   </FormItem>
                 )}/>
-              <FormField control={addressForm.control} name="region" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Region / Town</FormLabel>
-                  <FormControl><Input placeholder="e.g., Westlands" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}/>
               <FormField control={addressForm.control} name="description" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Address Description</FormLabel>

@@ -26,7 +26,6 @@ const VerifyPaymentInputSchema = z.object({
     ),
     totalAmount: z.number(),
     shippingAddress: z.object({
-      region: z.string(),
       description: z.string(),
     }),
     customerName: z.string(),
