@@ -44,7 +44,7 @@ function ReviewCard({ review }: { review: WithId<ReviewType> }) {
               />
             ))}
           </div>
-          <p className="text-gray-600 text-sm italic line-clamp-5">"{review.comment}"</p>
+          <p className="text-gray-600 text-sm line-clamp-5">"{review.comment}"</p>
         </div>
         <div className="mt-4 text-right">
           <p className="font-semibold text-gray-900">{review.userName}</p>

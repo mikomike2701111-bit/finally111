@@ -558,7 +558,7 @@ function DashboardContent() {
                   </TableCell>
                 </TableRow>
               ))}
-              {!isLoadingOrders && orders?.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-32 text-muted-foreground italic">No orders recorded yet.</TableCell></TableRow>}
+              {!isLoadingOrders && orders?.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-32 text-muted-foreground">No orders recorded yet.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>

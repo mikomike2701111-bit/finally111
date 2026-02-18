@@ -182,7 +182,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
         <div className="pt-4 border-t border-gray-100 space-y-4">
           <div className="space-y-1 mb-6">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Description</h3>
-            <p className="text-sm leading-relaxed text-gray-600 font-medium italic">{product.description}</p>
+            <p className="text-sm leading-relaxed text-gray-600 font-medium">{product.description}</p>
           </div>
 
           <div className="flex justify-between items-center py-2">
