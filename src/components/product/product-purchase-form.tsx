@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import type { Product } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Minus, Plus, LoaderCircle, CheckCircle2 } from 'lucide-react';
+import { Minus, Plus, LoaderCircle, CheckCircle2, Heart } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { cn } from '@/lib/utils';
 import { usePaystackPayment } from 'react-paystack';
@@ -41,7 +41,7 @@ const addressSchema = z.object({
 type AddressFormData = z.infer<typeof addressSchema>;
 
 export default function ProductPurchaseForm({ product, selectedColor, setSelectedColor }: ProductPurchaseFormProps) {
-  const { addToCart } = useAppContext();
+  const { addToCart, toggleWishlist, isProductInWishlist } = useAppContext();
   const [selectedSize, setSelectedSize] = useState('M');
   const [quantity, setQuantity] = useState(1);
   const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
@@ -111,97 +111,110 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   };
 
   const colorOptions = product.availableColors || [];
-  const availableSizes = product.sizes || ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+  const availableSizes = product.sizes || ['S', 'M', 'L', 'XL'];
+  const isInWishlist = isProductInWishlist(product.id);
 
   return (
     <>
-      <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-        <div className="space-y-2">
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900">{product.name}</h1>
-            <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full uppercase tracking-widest">{product.category}</span>
-                {product.style && (
-                  <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full uppercase tracking-widest border border-blue-100">
-                    {product.style}
-                  </span>
-                )}
-            </div>
+      <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm space-y-6 max-w-md">
+        <div className="flex justify-between items-start">
+            <h1 className="text-3xl font-bold text-gray-900 lowercase">{product.name}</h1>
+            <button 
+              onClick={() => toggleWishlist(product.id)}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <Heart size={20} className={cn(isInWishlist ? "fill-red-500 text-red-500" : "text-gray-400")} />
+            </button>
         </div>
 
-        {/* Description First, right after the title */}
-        <div className="space-y-2">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Product Story</h3>
-          <p className="text-sm leading-relaxed text-gray-600 font-medium">{product.description}</p>
-        </div>
-
-        <div className="pt-4 border-t border-gray-50 space-y-6">
-          {colorOptions.length > 0 && (
-            <div>
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Color Palette</h3>
-              <div className="flex items-center gap-3">
-                {colorOptions.map((color) => (
-                  <button 
-                    key={`${color.name}-${color.hex}`} 
-                    onClick={() => setSelectedColor(color.hex)} 
-                    className={cn(
-                      "w-8 h-8 rounded-full border-2 transition-all p-0.5", 
-                      selectedColor === color.hex ? 'border-black scale-110 shadow-sm' : 'border-transparent hover:border-gray-200'
-                    )}
-                  >
-                    <div className="w-full h-full rounded-full border border-gray-100" style={{ backgroundColor: color.hex }} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          <div>
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Size Select</h3>
-            <div className="flex flex-wrap gap-2">
-              {availableSizes.map((size) => (
+        {colorOptions.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-gray-900">Color</h3>
+            <div className="flex items-center gap-3">
+              {colorOptions.map((color) => (
                 <button 
-                  key={size} 
-                  onClick={() => setSelectedSize(size)} 
+                  key={`${color.name}-${color.hex}`} 
+                  onClick={() => setSelectedColor(color.hex)} 
                   className={cn(
-                    "min-w-[44px] h-10 px-3 rounded-xl text-xs font-bold transition-all border", 
-                    selectedSize === size 
-                      ? 'bg-black text-white border-black shadow-md' 
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                    "w-10 h-10 rounded-full border-2 transition-all p-0.5", 
+                    selectedColor === color.hex ? 'border-black scale-105' : 'border-gray-200'
                   )}
                 >
-                  {size}
+                  <div className="w-full h-full rounded-full border border-gray-100" style={{ backgroundColor: color.hex }} />
                 </button>
               ))}
             </div>
           </div>
-
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Quantity</h3>
-            <div className="flex items-center gap-3 bg-gray-50 rounded-full px-1 py-1 border">
-                <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={() => setQuantity(q => Math.max(1, q - 1))}><Minus className="w-3 h-3" /></Button>
-                <span className="w-6 text-center font-black text-sm">{quantity}</span>
-                <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={() => setQuantity(q => q + 1)}><Plus className="w-3 h-3" /></Button>
-            </div>
+        )}
+        
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-medium text-gray-900">Size</h3>
+            <button className="text-[10px] text-gray-500 font-medium hover:underline">Size Guide</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {availableSizes.map((size) => (
+              <button 
+                key={size} 
+                onClick={() => setSelectedSize(size)} 
+                className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold transition-all border", 
+                  selectedSize === size 
+                    ? 'bg-black text-white border-black shadow-sm' 
+                    : 'bg-gray-50 text-gray-900 border-gray-100 hover:border-gray-300'
+                )}
+              >
+                {size}
+              </button>
+            ))}
           </div>
         </div>
-        
-        <div className="pt-6 border-t border-gray-50 space-y-4">
-          <div className="flex justify-between items-end mb-2">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Investment</span>
-              <p className="text-2xl font-black text-gray-900">Ksh {(product.price * quantity).toLocaleString()}</p>
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-gray-900">Quantity</h3>
+          <div className="flex items-center gap-4 bg-gray-50 rounded-full px-4 py-2 w-fit border border-gray-100">
+              <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="hover:text-black text-gray-400"><Minus className="w-4 h-4" /></button>
+              <span className="w-4 text-center font-bold text-sm">{quantity}</span>
+              <button onClick={() => setQuantity(q => q + 1)} className="hover:text-black text-gray-400"><Plus className="w-4 h-4" /></button>
+          </div>
+        </div>
+
+        <div className="pt-4 border-t border-gray-100 space-y-4">
+          <div className="space-y-1 mb-6">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Description</h3>
+            <p className="text-sm leading-relaxed text-gray-600 font-medium italic">{product.description}</p>
+          </div>
+
+          <div className="flex justify-between items-center py-2">
+              <span className="text-sm font-medium text-gray-400">Total Price</span>
+              <p className="text-2xl font-black text-gray-900">Ksh {(product.price * quantity).toFixed(2)}</p>
           </div>
           
-          <div className="flex flex-col gap-2">
-              <Button size="lg" className="w-full rounded-full h-12 font-bold shadow-sm" onClick={() => addToCart(product, quantity)}>Add to Bag</Button>
-              <Button size="lg" variant="secondary" className="w-full rounded-full h-12 font-bold border border-gray-200" onClick={() => setIsAddressDialogOpen(true)}>
-                  Direct Buy with Paystack
+          <div className="flex flex-col gap-3">
+              <Button 
+                size="lg" 
+                className="w-full rounded-2xl h-14 text-sm font-bold bg-[#1a1a1a] hover:bg-black transition-all" 
+                onClick={() => addToCart(product, quantity)}
+              >
+                Add to Cart
               </Button>
-              <Button size="lg" variant="tactile-green" className="w-full rounded-full h-12 font-bold shadow-sm flex items-center justify-center gap-2" onClick={() => {
+              <Button 
+                size="lg" 
+                className="w-full rounded-2xl h-14 text-sm font-bold bg-[#1a1a1a] hover:bg-black transition-all" 
+                onClick={() => setIsAddressDialogOpen(true)}
+              >
+                Pay Now
+              </Button>
+              <Button 
+                size="lg" 
+                className="w-full rounded-2xl h-14 text-sm font-bold bg-[#25D366] hover:bg-[#20b35a] transition-all flex items-center justify-center gap-2" 
+                onClick={() => {
                   const message = `Hi Eddjos, I want to buy ${quantity}x ${product.name} (Size: ${selectedSize}). Total: Ksh ${(product.price * quantity).toLocaleString()}.`;
                   window.open(`https://wa.me/254740685488?text=${encodeURIComponent(message)}`, '_blank');
-              }}>
+                }}
+              >
                   <WhatsAppIcon />
-                  Order on WhatsApp
+                  Buy via WhatsApp
               </Button>
           </div>
         </div>
