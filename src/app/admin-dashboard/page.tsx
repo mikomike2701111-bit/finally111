@@ -483,7 +483,7 @@ function DashboardContent() {
         {isLoadingProducts && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-64 rounded-3xl" />)}
         {products?.map(product => (
           <Card key={product.id} className="group border-2 border-black rounded-3xl overflow-hidden hover:shadow-xl transition-all relative">
-            <div className="aspect-[4/5] relative bg-gray-100">
+            <div className="aspect-[4/5.5] relative bg-gray-100">
                 {product.images?.[0]?.url && (
                     <img src={product.images[0].url} alt={product.name} className="w-full h-full object-cover" />
                 )}
