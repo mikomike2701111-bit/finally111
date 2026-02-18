@@ -6,16 +6,16 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useFirebaseApp, useAuth, useUser } from '@/firebase';
 import { collection, doc, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Product, Order } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Trash, Edit, Copy, Star, PlusCircle } from 'lucide-react';
+import { Trash, Edit, Copy, Star, PlusCircle, LogOut, AlertCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const PRESET_COLORS = [
     { name: 'Black', hex: '#111827' }, { name: 'White', hex: '#FFFFFF' },
@@ -53,18 +54,14 @@ const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   slug: z.string().min(1, 'Slug is required'),
   description: z.string().min(1, 'Description is required'),
-  
   category: z.string().min(1, 'Category is required'),
   style: z.string().optional(),
-  
   price: z.coerce.number().min(0, 'Price must be positive'),
   originalPrice: z.coerce.number().optional().nullable(),
-
   imageUrl1: z.string().url('Must be a valid URL').optional().or(z.literal('')),
   imageUrl2: z.string().url('Must be a valid URL').optional().or(z.literal('')),
   imageUrl3: z.string().url('Must be a valid URL').optional().or(z.literal('')),
   imageUrl4: z.string().url('Must be a valid URL').optional().or(z.literal('')),
-  
   sizes: z.array(z.string()).optional(),
   availableColors: z.array(z.object({ name: z.string(), hex: z.string() })).optional(),
   isFeatured: z.boolean().optional(),
@@ -78,6 +75,7 @@ function DashboardContent() {
   const { toast } = useToast();
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
+  const auth = useAuth();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -91,7 +89,6 @@ function DashboardContent() {
   const [isStyleDialogOpen, setIsStyleDialogOpen] = useState(false);
   const [newStyleName, setNewStyleName] = useState('');
 
-  // Data fetching
   const productsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'products') : null, [firestore]);
   const categoriesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'categories') : null, [firestore]);
   const stylesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'styles') : null, [firestore]);
@@ -115,32 +112,6 @@ function DashboardContent() {
 
   const sortedCategories = useMemo(() => categories?.sort((a, b) => a.name.localeCompare(b.name)) || [], [categories]);
   const sortedStyles = useMemo(() => styles?.sort((a, b) => a.name.localeCompare(b.name)) || [], [styles]);
-
-  // Seed initial data
-  useEffect(() => {
-    if (!firestore || isLoadingCategories || isLoadingStyles) return;
-
-    if (categories) {
-        const defaultCategories = ['Women', 'Men', 'Unisex', 'Bags'];
-        const existingCategoryNames = new Set(categories.map(c => c.name.toLowerCase()));
-        defaultCategories.forEach(name => {
-            if (!existingCategoryNames.has(name.toLowerCase())) {
-                addDocumentNonBlocking(collection(firestore, 'categories'), { name });
-            }
-        });
-    }
-
-    if (styles) {
-        const defaultStyles = ['Casual', 'Streetwear', 'Formal', 'Vintage', 'Minimal', 'Small', 'Big', 'Luggage'];
-        const existingStyleNames = new Set(styles.map(s => s.name.toLowerCase()));
-        defaultStyles.forEach(name => {
-            if (!existingStyleNames.has(name.toLowerCase())) {
-                addDocumentNonBlocking(collection(firestore, 'styles'), { name });
-            }
-        });
-    }
-  }, [firestore, categories, styles, isLoadingCategories, isLoadingStyles]);
-
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
@@ -176,6 +147,7 @@ function DashboardContent() {
         (error) => {
             console.error("Upload failed", error);
             setUploading(false);
+            toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
         },
         () => {
             getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
@@ -229,8 +201,10 @@ function DashboardContent() {
 
     if (editingProduct) {
       updateDocumentNonBlocking(doc(firestore, 'products', editingProduct.id), productData);
+      toast({ title: 'Product Updated' });
     } else {
       addDocumentNonBlocking(collection(firestore, 'products'), { ...productData, createdAt: serverTimestamp() });
+      toast({ title: 'Product Added' });
     }
     
     setIsDialogOpen(false);
@@ -241,6 +215,7 @@ function DashboardContent() {
     if (!firestore) return;
     if (window.confirm('Are you sure you want to delete this product?')) {
       deleteDocumentNonBlocking(doc(firestore, 'products', productId));
+      toast({ title: 'Product Deleted' });
     }
   }
 
@@ -278,18 +253,30 @@ function DashboardContent() {
     })
   };
 
+  const handleLogout = async () => {
+    try {
+        await auth.signOut();
+        toast({ title: 'Logged out successfully' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Logout Failed', description: e.message });
+    }
+  };
+
   return (
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <Button onClick={openNewDialog}>Add New Product</Button>
+        <div className="flex gap-4">
+            <Button variant="outline" onClick={handleLogout}><LogOut className="h-4 w-4 mr-2" /> Logout</Button>
+            <Button onClick={openNewDialog}>Add New Product</Button>
+        </div>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editingProduct ? 'Edit Product Wizard' : 'New Product Wizard'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingProduct ? 'Edit Product' : 'New Product'}</DialogTitle></DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 py-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
               
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem><FormLabel>Product Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -301,24 +288,21 @@ function DashboardContent() {
 
               <FormField control={form.control} name="isFeatured" render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5"><FormLabel className="text-base">Feature on Homepage</FormLabel><FormDescription>Show in "Featured Products" on the homepage.</FormDescription></div>
+                    <div className="space-y-0.5"><FormLabel className="text-base">Feature on Homepage</FormLabel></div>
                     <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                   </FormItem>
               )}/>
 
               <Separator />
 
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Classification</h3>
-                <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="category" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Page / Category</FormLabel>
+                      <FormLabel>Category</FormLabel>
                        <div className="flex gap-2">
                         <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {isLoadingCategories && <SelectItem value="loading" disabled>Loading...</SelectItem>}
                             {sortedCategories.map(cat => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
@@ -329,12 +313,11 @@ function DashboardContent() {
                   )}/>
                   <FormField control={form.control} name="style" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Style / Sub-category</FormLabel>
+                      <FormLabel>Style</FormLabel>
                       <div className="flex gap-2">
                         <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Select a style" /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Style" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {isLoadingStyles && <SelectItem value="loading" disabled>Loading...</SelectItem>}
                             {sortedStyles.map(sty => <SelectItem key={sty.id} value={sty.name}>{sty.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
@@ -343,99 +326,65 @@ function DashboardContent() {
                       <FormMessage />
                     </FormItem>
                   )}/>
-                </div>
               </div>
 
-              <Separator />
-
-               <div>
-                <h3 className="text-lg font-semibold mb-4">Pricing</h3>
-                <div className="grid grid-cols-2 gap-4">
-                    <FormField control={form.control} name="originalPrice" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Original Price (Optional)</FormLabel>
-                        <FormControl><Input type="number" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : e.target.value)} placeholder="e.g., 2000" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}/>
+              <div className="grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="price" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Sale Price</FormLabel>
+                        <FormLabel>Price</FormLabel>
                         <FormControl><Input type="number" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}/>
-                </div>
-              </div>
-
-               <Separator />
-
-               <div>
-                <h3 className="text-lg font-semibold mb-2">Quick Image Uploader</h3>
-                <p className="text-xs text-muted-foreground mb-4">Upload an image, then copy the URL and paste it below.</p>
-                <div className="space-y-4 p-4 border rounded-lg">
-                    <FormItem><FormLabel>Upload Photo</FormLabel><FormControl><Input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploading} /></FormControl></FormItem>
-                    {uploading && <div className="space-y-2"><Progress value={uploadProgress} /><p className="text-sm text-center">{Math.round(uploadProgress)}%</p></div>}
-                    {uploadedUrl && !uploading && (
-                        <div className="space-y-2"><FormLabel>Uploaded URL</FormLabel><div className="flex items-center gap-2"><Input readOnly value={uploadedUrl} /><Button type="button" variant="outline" size="icon" onClick={copyUrlToClipboard}><Copy className="h-4 w-4" /></Button></div></div>
-                    )}
-                </div>
+                    <FormField control={form.control} name="originalPrice" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Original Price</FormLabel>
+                        <FormControl><Input type="number" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : e.target.value)} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}/>
               </div>
 
                <Separator />
               
-               <div>
-                <h3 className="text-lg font-semibold mb-4">Media</h3>
-                 <p className="text-xs text-muted-foreground mb-4">Use external URLs for images. The first is the main one.</p>
-                <div className="space-y-2">
-                    <FormField control={form.control} name="imageUrl1" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Main Image URL" /></FormControl><FormMessage /></FormItem> )}/>
-                    <FormField control={form.control} name="imageUrl2" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Gallery Image 2 URL" /></FormControl><FormMessage /></FormItem> )}/>
-                    <FormField control={form.control} name="imageUrl3" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Gallery Image 3 URL" /></FormControl><FormMessage /></FormItem> )}/>
-                    <FormField control={form.control} name="imageUrl4" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Gallery Image 4 URL" /></FormControl><FormMessage /></FormItem> )}/>
+               <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Images</h3>
+                <div className="p-4 border rounded-lg space-y-4">
+                    <Input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+                    {uploading && <Progress value={uploadProgress} className="h-2" />}
+                    {uploadedUrl && (
+                        <div className="flex items-center gap-2"><Input readOnly value={uploadedUrl} className="text-xs" /><Button type="button" variant="outline" size="icon" onClick={copyUrlToClipboard}><Copy className="h-4 w-4" /></Button></div>
+                    )}
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                    <FormField control={form.control} name="imageUrl1" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 1 URL (Main)" /></FormControl></FormItem> )}/>
+                    <FormField control={form.control} name="imageUrl2" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 2 URL" /></FormControl></FormItem> )}/>
+                    <FormField control={form.control} name="imageUrl3" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 3 URL" /></FormControl></FormItem> )}/>
+                    <FormField control={form.control} name="imageUrl4" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 4 URL" /></FormControl></FormItem> )}/>
                 </div>
               </div>
 
               <Separator />
 
-              <div>
-                 <h3 className="text-lg font-semibold mb-4">Details</h3>
-                 <div className='space-y-4'>
-                    <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} rows={5} /></FormControl><FormMessage /></FormItem>)}/>
-                    <FormField control={form.control} name="sizes" render={() => (
-                      <FormItem>
-                          <FormLabel>Available Sizes</FormLabel>
-                          <div className="flex flex-wrap gap-x-4 gap-y-2">
-                          {AVAILABLE_SIZES.map((size) => (
-                              <FormField key={size} control={form.control} name="sizes" render={({ field }) => (
-                                <FormItem key={size} className="flex flex-row items-center space-x-2 space-y-0">
-                                  <FormControl><Checkbox checked={field.value?.includes(size)} onCheckedChange={(c) => field.onChange(c ? [...(field.value || []), size] : (field.value || []).filter(v => v !== size))} /></FormControl>
-                                  <FormLabel className="font-normal text-sm">{size}</FormLabel>
-                                </FormItem>
-                              )}/>
-                          ))}
-                          </div><FormMessage />
-                      </FormItem>
-                    )}/>
-                 </div>
-              </div>
-
-               <Separator />
+              <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} rows={4} /></FormControl><FormMessage /></FormItem>)}/>
               
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Color Palette</h3>
-                 <FormField control={form.control} name="availableColors" render={({ field }) => (
-                  <FormItem><FormControl>
-                      <div className="grid grid-cols-6 sm:grid-cols-8 gap-3">
-                        {PRESET_COLORS.map((color) => {
-                          const isSelected = field.value?.some(c => c.hex === color.hex);
-                          return <button type="button" key={color.hex} onClick={() => field.onChange(isSelected ? (field.value || []).filter(c => c.hex !== color.hex) : [...(field.value || []), color])} className={`w-9 h-9 rounded-full border-2 transition-all ${isSelected ? 'ring-2 ring-offset-2 ring-primary' : 'border-gray-300'}`} style={{ backgroundColor: color.hex }} title={color.name}><span className="sr-only">{color.name}</span></button>;
-                        })}
-                      </div>
-                  </FormControl><FormMessage /></FormItem>
-                )}/>
-              </div>
+              <FormField control={form.control} name="sizes" render={() => (
+                <FormItem>
+                    <FormLabel>Sizes</FormLabel>
+                    <div className="flex flex-wrap gap-4">
+                    {AVAILABLE_SIZES.map((size) => (
+                        <FormField key={size} control={form.control} name="sizes" render={({ field }) => (
+                        <FormItem key={size} className="flex flex-row items-center space-x-2 space-y-0">
+                            <FormControl><Checkbox checked={field.value?.includes(size)} onCheckedChange={(c) => field.onChange(c ? [...(field.value || []), size] : (field.value || []).filter(v => v !== size))} /></FormControl>
+                            <FormLabel className="font-normal">{size}</FormLabel>
+                        </FormItem>
+                        )}/>
+                    ))}
+                    </div>
+                </FormItem>
+              )}/>
 
-              <Button type="submit" size="lg" className="w-full">{editingProduct ? 'Save Changes' : 'Finish & Add Product'}</Button>
+              <Button type="submit" size="lg" className="w-full">{editingProduct ? 'Update Product' : 'Add Product'}</Button>
             </form>
           </Form>
         </DialogContent>
@@ -443,43 +392,42 @@ function DashboardContent() {
       
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
           <DialogContent>
-              <DialogHeader><DialogTitle>Add New Category</DialogTitle></DialogHeader>
-              <div className="py-4"><Input placeholder="Category Name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} /></div>
-              <DialogFooter><Button onClick={handleAddCategory}>Save Category</Button></DialogFooter>
+              <DialogHeader><DialogTitle>New Category</DialogTitle></DialogHeader>
+              <Input placeholder="Category Name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
+              <DialogFooter><Button onClick={handleAddCategory}>Add</Button></DialogFooter>
           </DialogContent>
       </Dialog>
       
       <Dialog open={isStyleDialogOpen} onOpenChange={setIsStyleDialogOpen}>
           <DialogContent>
-              <DialogHeader><DialogTitle>Add New Style</DialogTitle></DialogHeader>
-              <div className="py-4"><Input placeholder="Style Name" value={newStyleName} onChange={(e) => setNewStyleName(e.target.value)} /></div>
-              <DialogFooter><Button onClick={handleAddStyle}>Save Style</Button></DialogFooter>
+              <DialogHeader><DialogTitle>New Style</DialogTitle></DialogHeader>
+              <Input placeholder="Style Name" value={newStyleName} onChange={(e) => setNewStyleName(e.target.value)} />
+              <DialogFooter><Button onClick={handleAddStyle}>Add</Button></DialogFooter>
           </DialogContent>
       </Dialog>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoadingProducts && Array.from({ length: 6 }).map((_, i) => <Card key={i}><CardHeader><CardTitle><div className="h-6 bg-gray-200 rounded w-3/4 animate-pulse" /></CardTitle></CardHeader><CardContent><div className="h-4 bg-gray-200 rounded w-1/2 mb-2 animate-pulse" /><div className="h-4 bg-gray-200 rounded w-full animate-pulse" /></CardContent></Card>)}
+        {isLoadingProducts && Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
         {products?.map(product => (
           <Card key={product.id}>
-            <CardHeader>
-              <CardTitle className="flex justify-between items-start">
-                <span className="truncate pr-2 flex items-center gap-2">
-                  {product.isFeatured && <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 flex-shrink-0" />}
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex justify-between items-start">
+                <span className="truncate flex items-center gap-2">
+                  {product.isFeatured && <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />}
                   {product.name}
                 </span>
-                 <div className="flex gap-2 flex-shrink-0">
+                 <div className="flex gap-1">
                     <Button variant="ghost" size="icon" onClick={() => openEditDialog(product)}><Edit className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id)}><Trash className="h-4 w-4 text-destructive" /></Button>
                 </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-lg font-semibold">Ksh {product.price}</p>
-              <p className="text-sm text-muted-foreground capitalize">{product.category}</p>
-              <p className="text-sm mt-2 line-clamp-3">{product.description}</p>
+              <p className="text-xl font-bold">Ksh {product.price}</p>
+              <p className="text-sm text-muted-foreground uppercase">{product.category}</p>
             </CardContent>
-            <CardFooter className="flex justify-end">
-                <p className="text-sm font-semibold">Sales: {salesCount[product.id] || 0}</p>
+            <CardFooter className="pt-0 text-sm font-medium">
+                Sales: {salesCount[product.id] || 0}
             </CardFooter>
           </Card>
         ))}
@@ -487,58 +435,37 @@ function DashboardContent() {
 
       <Separator className="my-12" />
 
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Recent Orders</h2>
-      </div>
-
+      <h2 className="text-2xl font-bold mb-6">Recent Orders</h2>
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[150px]">Date</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Products</TableHead>
+                <TableHead>Items</TableHead>
                 <TableHead>Total</TableHead>
-                <TableHead>Shipping Address</TableHead>
-                <TableHead className="text-right w-[140px]">Status</TableHead>
+                <TableHead className="text-right">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoadingOrders && (
-                  <TableRow>
-                      <TableCell colSpan={6} className="text-center h-24">
-                          Loading orders...
-                      </TableCell>
-                  </TableRow>
-              )}
+              {isLoadingOrders && <TableRow><TableCell colSpan={5} className="text-center">Loading orders...</TableCell></TableRow>}
               {orders?.map(order => (
                 <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.createdAt ? format((order.createdAt as Timestamp).toDate(), 'PPP') : 'N/A'}</TableCell>
+                  <TableCell className="whitespace-nowrap">{order.createdAt ? format((order.createdAt as Timestamp).toDate(), 'PP') : 'N/A'}</TableCell>
                   <TableCell>
-                    <div className="font-medium">{order.customerName || 'N/A'}</div>
-                    <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
+                    <div className="font-medium">{order.customerName}</div>
                     <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
                   </TableCell>
                   <TableCell>
-                    <ul className="text-xs space-y-1">
-                      {order.products.map(p => (
-                        <li key={p.id}>{p.name} (x{p.quantity})</li>
-                      ))}
-                    </ul>
+                    <div className="text-xs">
+                        {order.products.map(p => `${p.name} x${p.quantity}`).join(', ')}
+                    </div>
                   </TableCell>
-                  <TableCell>Ksh {order.totalAmount.toFixed(2)}</TableCell>
-                  <TableCell className="text-xs">
-                      {order.shippingAddress.description}
-                  </TableCell>
+                  <TableCell className="font-bold">Ksh {order.totalAmount}</TableCell>
                   <TableCell className="text-right">
-                    <Select
-                      value={order.status}
-                      onValueChange={(newStatus) => handleUpdateOrderStatus(order.id, newStatus as Order['status'])}
-                    >
-                      <SelectTrigger className="w-[120px] h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
+                    <Select value={order.status} onValueChange={(s) => handleUpdateOrderStatus(order.id, s as any)}>
+                      <SelectTrigger className="w-[120px] h-8 text-xs ml-auto"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="shipped">Shipped</SelectItem>
@@ -549,13 +476,7 @@ function DashboardContent() {
                   </TableCell>
                 </TableRow>
               ))}
-              {!isLoadingOrders && orders?.length === 0 && (
-                  <TableRow>
-                      <TableCell colSpan={6} className="text-center h-24">
-                          No orders found.
-                      </TableCell>
-                  </TableRow>
-              )}
+              {!isLoadingOrders && orders?.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">No orders yet.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
@@ -576,63 +497,58 @@ export default function AdminDashboard() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth || !ADMIN_EMAIL) {
-        setLoginError("Authentication service or admin email is not configured.");
-        return;
-    };
+    if (!auth) return;
 
     setIsLoggingIn(true);
     setLoginError(null);
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
-        setLoginError("Login failed. Please check your credentials. The admin user may need to be created in the Firebase Console first.");
-      } else {
-        setLoginError(`Login failed: ${error.message}`);
-      }
+      console.error("Login error:", error);
+      setLoginError("Login failed. Check your credentials or configuration.");
     } finally {
       setIsLoggingIn(false);
     }
   };
 
   if (isUserLoading) {
+    return <div className="flex justify-center items-center h-screen"><Skeleton className="h-64 w-full max-w-sm" /></div>;
+  }
+
+  // Configuration check
+  if (!ADMIN_EMAIL) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Skeleton className="h-48 w-full max-w-sm rounded-lg" />
+      <div className="container mx-auto py-12 flex justify-center">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Configuration Missing</AlertTitle>
+          <AlertDescription>
+            The <code>NEXT_PUBLIC_ADMIN_EMAIL</code> environment variable is not set. 
+            Please check your <code>.env</code> file and restart the server.
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
 
-  if (user && user.email === ADMIN_EMAIL) {
+  const isAuthorized = user && user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+  if (isAuthorized) {
     return <DashboardContent />;
   }
 
-  if (user && user.email !== ADMIN_EMAIL) {
-    return (
-       <div className="container mx-auto py-8 text-center">
-        <Card className="max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>You are not authorized to view this page.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    )
-  }
-
   return (
-    <div className="container mx-auto py-8 flex justify-center items-center min-h-[60vh]">
+    <div className="container mx-auto py-12 flex justify-center items-center min-h-[60vh]">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle>Admin Access</CardTitle>
-          <CardDescription>Enter the admin credentials to access the dashboard.</CardDescription>
+          <CardTitle>Admin Login</CardTitle>
+          <CardDescription>Enter admin credentials to continue</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+          <form onSubmit={handleLogin} className="space-y-4">
              <Input
               type="email"
-              placeholder="Email"
+              placeholder="Admin Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoggingIn}
@@ -649,11 +565,24 @@ export default function AdminDashboard() {
             <Button type="submit" disabled={isLoggingIn} className="w-full">
               {isLoggingIn ? 'Logging In...' : 'Login'}
             </Button>
-            {loginError && <p className="text-sm font-medium text-destructive text-center">{loginError}</p>}
+            {loginError && <p className="text-xs text-destructive text-center font-medium">{loginError}</p>}
+            
+            {user && !isAuthorized && (
+                <div className="mt-4 p-3 bg-muted rounded-md text-xs text-center text-destructive">
+                    Logged in as <strong>{user.email}</strong>, which is not the configured admin email. 
+                    Expected: <strong>{ADMIN_EMAIL}</strong>.
+                    <Button variant="link" size="sm" onClick={() => auth.signOut()} className="mt-1 block mx-auto">Sign Out</Button>
+                </div>
+            )}
           </form>
-          <p className="mt-4 text-xs text-center text-muted-foreground">
-              Note: For first-time setup, you must create the admin user in your Firebase Console (Authentication &gt; Add user).
-          </p>
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg text-xs text-muted-foreground">
+              <p className="font-bold mb-1">Getting Started:</p>
+              <ul className="list-disc pl-4 space-y-1">
+                  <li>Configure <code>NEXT_PUBLIC_ADMIN_EMAIL</code> in <code>.env</code></li>
+                  <li>Create this user in <strong>Firebase Console &gt; Authentication</strong></li>
+                  <li>Restart your local server after updating <code>.env</code></li>
+              </ul>
+          </div>
         </CardContent>
       </Card>
     </div>
