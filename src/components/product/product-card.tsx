@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -32,7 +31,7 @@ export default function ProductCard({ product }: { product: Product }) {
   }
 
   return (
-    <div className="relative group aspect-[3/4] rounded-[2.5rem] overflow-hidden border-2 border-black bg-gray-100 shadow-sm transition-all duration-500 hover:shadow-2xl">
+    <div className="relative group aspect-[4/5] rounded-2xl overflow-hidden border-2 border-black bg-gray-100 shadow-sm transition-all duration-500 hover:shadow-2xl">
       <Image
         src={primaryImage.url}
         alt={primaryImage.alt}
@@ -44,7 +43,7 @@ export default function ProductCard({ product }: { product: Product }) {
       
       {/* Badge (Top Left) */}
       <div className="absolute top-5 left-5 z-20">
-        <span className="bg-white/90 backdrop-blur-sm text-black text-[10px] font-black px-4 py-2 rounded-2xl uppercase tracking-widest shadow-lg border border-white/50">
+        <span className="bg-white/90 backdrop-blur-sm text-black text-[10px] font-black px-4 py-2 rounded-xl uppercase tracking-widest shadow-lg border border-white/50">
           {product.style || product.category}
         </span>
       </div>
@@ -69,7 +68,7 @@ export default function ProductCard({ product }: { product: Product }) {
       />
 
       {/* Info Bubble (Bottom) */}
-      <div className="absolute bottom-5 left-5 right-5 z-20 bg-white/60 backdrop-blur-xl rounded-[2.5rem] p-6 flex items-center justify-between shadow-2xl border border-white/30">
+      <div className="absolute bottom-5 left-5 right-5 z-20 bg-white/60 backdrop-blur-xl rounded-xl p-5 flex items-center justify-between shadow-2xl border border-white/30">
         <div className="flex flex-col gap-0.5 overflow-hidden">
           <p className="text-gray-800 text-sm font-medium lowercase truncate opacity-80">
             {product.name}

@@ -116,7 +116,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
 
   return (
     <>
-      <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm space-y-6 max-w-md">
+      <div className="bg-white p-6 md:p-8 rounded-xl shadow-sm space-y-6 max-w-md">
         <div className="flex justify-between items-start">
             <h1 className="text-3xl font-bold text-gray-900 lowercase">{product.name}</h1>
             <button 
