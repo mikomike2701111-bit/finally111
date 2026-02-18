@@ -45,10 +45,9 @@ export type Order = {
   };
   status: 'pending' | 'shipped' | 'delivered' | 'cancelled';
   createdAt: Timestamp;
-  // Optional customer info
-  customerName?: string;
-  customerEmail?: string;
-  customerPhone?: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
 };
 
 export type WithId<T> = T & { id: string };

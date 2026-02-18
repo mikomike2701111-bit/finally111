@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useFirebaseApp, useAuth, useUser } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, useFirebaseApp, useAuth, useUser, addDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Trash, Edit, Copy, Star, PlusCircle, LogOut, AlertCircle, ShoppingBag, Package, CheckCircle2, Check } from 'lucide-react';
+import { Trash, Edit, Copy, Star, PlusCircle, LogOut, AlertCircle, ShoppingBag, Package, CheckCircle2, Check, MapPin } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
@@ -108,8 +108,8 @@ function DashboardContent() {
     }, { totalSales: 0, pendingOrders: 0, totalRevenue: 0 });
   }, [orders]);
 
-  const sortedCategories = useMemo(() => categories?.sort((a, b) => a.name.localeCompare(b.name)) || [], [categories]);
-  const sortedStyles = useMemo(() => styles?.sort((a, b) => a.name.localeCompare(b.name)) || [], [styles]);
+  const sortedCategories = useMemo(() => categories?.sort((a, b) => a.name.compare(b.name)) || [], [categories]);
+  const sortedStyles = useMemo(() => styles?.sort((a, b) => a.name.compare(b.name)) || [], [styles]);
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
@@ -521,14 +521,15 @@ function DashboardContent() {
             <TableHeader className="bg-gray-50 border-b-2 border-black">
               <TableRow>
                 <TableHead className="font-bold text-black uppercase tracking-tighter">Date</TableHead>
-                <TableHead className="font-bold text-black uppercase tracking-tighter">Customer</TableHead>
-                <TableHead className="font-bold text-black uppercase tracking-tighter">Items</TableHead>
+                <TableHead className="font-bold text-black uppercase tracking-tighter">Customer & Contact</TableHead>
+                <TableHead className="font-bold text-black uppercase tracking-tighter">Delivery Address</TableHead>
+                <TableHead className="font-bold text-black uppercase tracking-tighter">Items Ordered</TableHead>
                 <TableHead className="font-bold text-black uppercase tracking-tighter">Total</TableHead>
                 <TableHead className="font-bold text-black uppercase tracking-tighter text-right">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoadingOrders && <TableRow><TableCell colSpan={5} className="text-center h-32">Loading orders...</TableCell></TableRow>}
+              {isLoadingOrders && <TableRow><TableCell colSpan={6} className="text-center h-32">Loading orders...</TableCell></TableRow>}
               {orders?.map(order => (
                 <TableRow key={order.id} className="hover:bg-gray-50/50">
                   <TableCell className="whitespace-nowrap font-medium">{order.createdAt ? format((order.createdAt as Timestamp).toDate(), 'PP') : 'N/A'}</TableCell>
@@ -536,15 +537,25 @@ function DashboardContent() {
                     <div className="font-black text-sm">{order.customerName}</div>
                     <div className="text-xs text-muted-foreground flex flex-col">
                         <span>{order.customerPhone}</span>
-                        <span className="truncate max-w-[150px]">{order.customerEmail}</span>
+                        <span className="truncate max-w-[200px]">{order.customerEmail}</span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="text-xs font-medium">
-                        {order.products.map(p => `${p.name} (x${p.quantity})`).join(', ')}
+                    <div className="flex items-start gap-2 max-w-[250px]">
+                      <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                      <span className="text-xs font-medium leading-relaxed">{order.shippingAddress?.description || 'No address provided'}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-black">Ksh {order.totalAmount.toLocaleString()}</TableCell>
+                  <TableCell>
+                    <div className="text-xs font-bold space-y-1">
+                        {order.products.map((p, idx) => (
+                          <div key={idx} className="bg-gray-100 px-2 py-1 rounded-md mb-1">
+                            {p.name} <span className="text-muted-foreground ml-1">x{p.quantity}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-black text-lg">Ksh {order.totalAmount.toLocaleString()}</TableCell>
                   <TableCell className="text-right">
                     <Select value={order.status} onValueChange={(s) => handleUpdateOrderStatus(order.id, s as any)}>
                       <SelectTrigger className="w-[120px] h-9 text-xs ml-auto rounded-full font-bold border-2"><SelectValue /></SelectTrigger>
@@ -558,7 +569,7 @@ function DashboardContent() {
                   </TableCell>
                 </TableRow>
               ))}
-              {!isLoadingOrders && orders?.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-32 text-muted-foreground">No orders recorded yet.</TableCell></TableRow>}
+              {!isLoadingOrders && orders?.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-32 text-muted-foreground">No orders recorded yet.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
@@ -662,7 +673,7 @@ export default function AdminDashboard() {
             
             {user && !isAuthorized && (
                 <div className="mt-6 p-4 bg-red-50 border-2 border-red-100 rounded-2xl text-xs text-center">
-                    <p className="text-red-800 font-bold mb-1 italic">Unauthorized Account</p>
+                    <p className="text-red-800 font-bold mb-1">Unauthorized Account</p>
                     <p className="text-red-600 mb-3">Logged in as <strong>{user.email}</strong>, which is not the configured admin email.</p>
                     <Button variant="outline" size="sm" onClick={() => auth.signOut()} className="w-full rounded-xl border-2 border-red-200 text-red-700 hover:bg-red-100">Switch Account</Button>
                 </div>
