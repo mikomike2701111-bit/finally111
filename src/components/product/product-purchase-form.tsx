@@ -128,7 +128,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
             </div>
         </div>
 
-        {/* Description First */}
+        {/* Description First, right after the title */}
         <div className="space-y-2">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Product Story</h3>
           <p className="text-sm leading-relaxed text-gray-600 font-medium">{product.description}</p>

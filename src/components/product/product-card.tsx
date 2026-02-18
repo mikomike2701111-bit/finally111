@@ -50,7 +50,7 @@ export default function ProductCard({ product }: { product: Product }) {
           )}
         </div>
 
-        {/* This link overlay allows the card to be clickable without illegal nesting of buttons inside anchors */}
+        {/* Link overlay for the whole card area */}
         <Link 
           href={`/products/${product.slug}`} 
           className="absolute inset-0 z-10" 
