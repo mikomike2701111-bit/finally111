@@ -71,7 +71,7 @@ export default function ProductPage() {
           }
         }
         setIsImageFading(false);
-    }, 300);
+    }, 150); // Faster transition
   };
   
   if (isLoading) {
@@ -93,22 +93,7 @@ export default function ProductPage() {
                       <Skeleton className="h-6 w-1/4" />
                   </div>
                   <div className="space-y-4">
-                      <div>
-                          <Skeleton className="h-4 w-12 mb-2" />
-                          <div className="flex gap-2">
-                              <Skeleton className="h-8 w-8 rounded-full" />
-                              <Skeleton className="h-8 w-8 rounded-full" />
-                              <Skeleton className="h-8 w-8 rounded-full" />
-                          </div>
-                      </div>
-                      <div>
-                          <Skeleton className="h-4 w-12 mb-2" />
-                          <div className="flex gap-2">
-                              <Skeleton className="h-10 w-16 rounded-full" />
-                              <Skeleton className="h-10 w-16 rounded-full" />
-                              <Skeleton className="h-10 w-16 rounded-full" />
-                          </div>
-                      </div>
+                    <Skeleton className="h-32 w-full" />
                   </div>
                   <div className="border-t pt-6 space-y-4">
                       <div className="flex justify-between items-center">
@@ -118,14 +103,7 @@ export default function ProductPage() {
                       <div className="grid grid-cols-1 gap-2">
                           <Skeleton className="h-12 w-full rounded-full" />
                           <Skeleton className="h-12 w-full rounded-full" />
-                          <Skeleton className="h-12 w-full rounded-full" />
                       </div>
-                  </div>
-                  <div className="space-y-2">
-                      <Skeleton className="h-6 w-1/4" />
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-5/6" />
                   </div>
               </div>
             </div>
@@ -153,18 +131,18 @@ export default function ProductPage() {
 
   return (
     <>
-      <div className="py-2 md:py-8 lg:py-12 space-y-12">
-        <div className="grid lg:grid-cols-2 lg:gap-12 items-start">
+      <div className="py-2 md:py-8 lg:py-12 space-y-12 max-w-6xl mx-auto">
+        <div className="grid lg:grid-cols-2 lg:gap-16 items-start">
           {/* Image Gallery */}
           <div className="space-y-4 lg:sticky lg:top-24">
-            <div className="aspect-square relative rounded-2xl bg-gray-100 overflow-hidden shadow-lg">
+            <div className="aspect-square relative rounded-3xl bg-gray-50 overflow-hidden shadow-sm border border-gray-100">
               {primaryImage ? (
                 <Image
                   src={primaryImage.url}
                   alt={primaryImage.alt}
                   fill
                   className={cn(
-                    "object-cover transition-opacity ease-in-out duration-300",
+                    "object-cover transition-opacity ease-in-out duration-200",
                     isImageFading ? "opacity-0" : "opacity-100"
                   )}
                   sizes="(max-width: 1024px) 100vw, 50vw"
@@ -172,20 +150,20 @@ export default function ProductPage() {
                   data-ai-hint={primaryImage.hint}
                 />
               ) : (
-                <div className="w-full h-full bg-gray-200 flex items-center justify-center text-muted-foreground">No Image</div>
+                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-muted-foreground">No Image</div>
               )}
             </div>
             
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-3">
               {thumbnailSlots.map((image, index) =>
                 image ? (
                   <div
                     key={index}
                     className={cn(
-                      'aspect-square relative rounded-lg bg-black overflow-hidden cursor-pointer transition-all',
+                      'aspect-square relative rounded-2xl bg-gray-50 overflow-hidden cursor-pointer transition-all border',
                       primaryImage?.url === image.url
-                        ? 'ring-2 ring-primary ring-offset-2'
-                        : 'hover:opacity-75'
+                        ? 'border-primary ring-2 ring-primary ring-offset-2'
+                        : 'border-transparent hover:border-gray-200'
                     )}
                     onClick={() => handleThumbnailClick(image)}
                   >
@@ -201,7 +179,7 @@ export default function ProductPage() {
                 ) : (
                   <div
                     key={`placeholder-${index}`}
-                    className="aspect-square rounded-lg bg-gray-100 border-2 border-dashed border-gray-300"
+                    className="aspect-square rounded-2xl bg-gray-50 border border-dashed border-gray-200"
                   />
                 )
               )}
@@ -209,7 +187,7 @@ export default function ProductPage() {
           </div>
 
           {/* Product Info */}
-          <div className="bg-transparent lg:bg-gray-50/50 p-0 lg:p-2 rounded-2xl mt-6 lg:mt-0">
+          <div className="mt-6 lg:mt-0">
             <ProductPurchaseForm 
               product={product} 
               selectedColor={selectedColorHex} 
