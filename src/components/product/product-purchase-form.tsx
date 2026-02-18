@@ -41,14 +41,13 @@ const addressSchema = z.object({
 type AddressFormData = z.infer<typeof addressSchema>;
 
 export default function ProductPurchaseForm({ product, selectedColor, setSelectedColor }: ProductPurchaseFormProps) {
-  const { addToCart, toggleWishlist, isProductInWishlist } = useAppContext();
+  const { addToCart } = useAppContext();
   const [selectedSize, setSelectedSize] = useState('M');
   const [quantity, setQuantity] = useState(1);
   const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
-  const isInWishlist = isProductInWishlist(product.id);
   const { toast } = useToast();
   
   const addressForm = useForm<AddressFormData>({
@@ -186,7 +185,6 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
           </div>
         </div>
         
-        {/* Price and Buttons */}
         <div className="pt-6 border-t border-gray-50 space-y-4">
           <div className="flex justify-between items-end mb-2">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Investment</span>

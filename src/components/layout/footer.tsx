@@ -18,7 +18,7 @@ export default function Footer() {
   const isAdminVisible = isMounted && pathname === '/bags';
 
   return (
-    <footer className="bg-background text-black pt-12 px-6 sm:px-12 lg:px-20 pb-[74px]">
+    <footer className="bg-background text-black pt-12 px-6 sm:px-12 lg:px-20 pb-[75px]">
       <div className="space-y-6 max-w-7xl mx-auto">
 
         {/* Top Segment */}

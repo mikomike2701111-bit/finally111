@@ -489,7 +489,6 @@ function DashboardContent() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 
-                {/* Floating white description at bottom left */}
                 <div className="absolute bottom-4 left-4 z-10 pointer-events-none max-w-[80%]">
                     <p className="text-white text-xs font-medium line-clamp-2 drop-shadow-md">
                         {product.description}
@@ -598,7 +597,6 @@ export default function AdminDashboard() {
     return <div className="flex justify-center items-center h-screen"><Skeleton className="h-64 w-full max-w-sm" /></div>;
   }
 
-  // Configuration check
   if (!ADMIN_EMAIL) {
     return (
       <div className="container mx-auto py-12 flex justify-center">

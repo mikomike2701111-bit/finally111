@@ -32,7 +32,6 @@ export default function ProductCard({ product }: { product: Product }) {
 
   return (
     <div className="relative group bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 transition-all duration-300 hover:shadow-md">
-      {/* The main card is a div, and we place the link as a full-size overlay to avoid illegal nesting */}
       <div className="aspect-[3/4] relative overflow-hidden bg-gray-50">
         <Image
           src={primaryImage.url}
@@ -43,7 +42,6 @@ export default function ProductCard({ product }: { product: Product }) {
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
         
-        {/* Top Badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-2 z-20">
           {product.style && (
             <span className="bg-white/90 backdrop-blur-sm text-black text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider border border-white/50">
@@ -52,10 +50,13 @@ export default function ProductCard({ product }: { product: Product }) {
           )}
         </div>
 
-        {/* Floating Link Overlay (covers everything except interactive buttons) */}
-        <Link href={`/products/${product.slug}`} className="absolute inset-0 z-10" aria-label={`View ${product.name}`} />
+        {/* This link overlay allows the card to be clickable without illegal nesting of buttons inside anchors */}
+        <Link 
+          href={`/products/${product.slug}`} 
+          className="absolute inset-0 z-10" 
+          aria-label={`View ${product.name}`} 
+        />
 
-        {/* Quick Add Overlay - Above the Link z-index */}
         <div className="absolute inset-x-0 bottom-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300 z-20 bg-gradient-to-t from-black/60 to-transparent pointer-events-none">
            <button
             onClick={handleAddToCartClick}
