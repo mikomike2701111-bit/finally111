@@ -1,9 +1,27 @@
-# 🚀 Deployment Guide
+# 🚀 Deployment & Git Guide
 
-Run these commands in your terminal one by one to push your changes to GitHub.
+Follow these instructions to push your code to GitHub and set up your live environment.
 
-### Terminal Commands
+## ⚙️ 1. Environment Setup (Vercel)
 
+Before the app works on Vercel, you **must** add these variables in your Vercel Project Settings:
+
+| Key Name | Value Source |
+| :--- | :--- |
+| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack Dashboard |
+| `PAYSTACK_SECRET_KEY` | Paystack Dashboard |
+| `GOOGLE_GENAI_API_KEY` | Google AI Studio |
+| `FIREBASE_SERVICE_ACCOUNT` | Firebase JSON Key (as string) |
+| `NEXT_PUBLIC_ADMIN_EMAIL` | `admin@runway.com` |
+
+---
+
+## 💻 2. Terminal Commands (Copy & Paste)
+
+Run these commands in your project terminal to push your latest changes.
+
+### A. Standard Method (Prompts for password)
+Use this if you want to be asked for your username and token separately.
 ```bash
 git init
 git add .
@@ -13,26 +31,21 @@ git remote set-url origin https://github.com/mikomikE254254/finally111.git
 git push -u origin main
 ```
 
----
-
-### 💡 Authentication Help
-When you run `git push`, it will ask for:
-- **Username:** `mikomikE254254`
-- **Password:** Paste your **Personal Access Token** (NOT your GitHub password).
-
-**Generate a token here if you don't have one:** [github.com/settings/tokens/new](https://github.com/settings/tokens/new)
-*(Make sure to check the **'repo'** box when creating it!)*
+### B. Express Method (No login prompts)
+Replace `PASTE_YOUR_TOKEN_HERE` with your GitHub Personal Access Token.
+```bash
+git push https://mikomikE254254:PASTE_YOUR_TOKEN_HERE@github.com/mikomikE254254/finally111.git main
+```
 
 ---
 
-## ⚙️ Environment Setup for Vercel
+## 🔑 3. How to get your Access Token
+1. Go to: [**github.com/settings/tokens/new**](https://github.com/settings/tokens/new)
+2. Select **'repo'** (Full control of private repositories).
+3. Click **Generate token** and copy it immediately.
+4. Use this token as your **password** in the terminal.
 
-Add these keys to your Vercel project **Settings > Environment Variables**:
+---
 
-| Key Name | Value Source |
-| :--- | :--- |
-| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack Dashboard |
-| `PAYSTACK_SECRET_KEY` | Paystack Dashboard |
-| `GOOGLE_GENAI_API_KEY` | Google AI Studio |
-| `FIREBASE_SERVICE_ACCOUNT` | Firebase JSON Key |
-| `NEXT_PUBLIC_ADMIN_EMAIL` | `admin@runway.com` |
+## 🛠️ Troubleshooting Vercel Builds
+If you see "Automatic initialization failed", it means your **Firebase Environment Variables** are missing in the Vercel dashboard. Double check that `NEXT_PUBLIC_FIREBASE_API_KEY` and others are set.

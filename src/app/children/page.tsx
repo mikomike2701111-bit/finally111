@@ -42,7 +42,7 @@ export default function UnisexPage() {
       let q: Query<DocumentData> = query(collection(firestore, 'products'), where('category', '==', 'Unisex'));
 
       if (activeTab.toLowerCase() !== 'all') {
-        q = query(q, where('style', '==', activeTab.toLowerCase()));
+        q = query(q, where('style', '==', activeTab));
       }
       
       const cursor = isNewQuery ? null : lastVisible;
@@ -61,7 +61,8 @@ export default function UnisexPage() {
       setLastVisible(lastDoc || null);
       setProducts(currentProducts => {
         const combined = isNewQuery ? newProducts : [...currentProducts, ...newProducts];
-        combined.sort((a, b) => a.name.localeCompare(b.name));
+        // Ensure name exists before sorting to avoid crashes
+        combined.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         return combined;
       });
     } catch (error) {
