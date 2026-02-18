@@ -67,18 +67,18 @@ export default function ProductCard({ product }: { product: Product }) {
         aria-label={`View ${product.name}`} 
       />
 
-      {/* Info Bubble (Bottom) */}
-      <div className="absolute bottom-5 left-5 right-5 z-20 bg-white/60 backdrop-blur-xl rounded-xl p-5 flex items-center justify-between shadow-2xl border border-white/30">
+      {/* Info Bubble (Bottom) - 25% Transparency (bg-white/25) and Increased corner radius */}
+      <div className="absolute bottom-5 left-5 right-5 z-20 bg-white/25 backdrop-blur-xl rounded-2xl p-5 flex items-center justify-between shadow-2xl border border-white/30">
         <div className="flex flex-col gap-0.5 overflow-hidden">
           <p className="text-gray-800 text-sm font-medium lowercase truncate opacity-80">
             {product.name}
           </p>
           <div className="flex items-center gap-4">
-            <span className="text-lg font-black text-black">
+            <span className="text-lg font-medium text-black">
               Ksh {product.price.toLocaleString()}
             </span>
             {product.originalPrice && (
-              <span className="text-xs text-red-500 line-through font-bold opacity-80">
+              <span className="text-xs text-red-500 line-through font-medium opacity-80">
                 Ksh {product.originalPrice.toLocaleString()}
               </span>
             )}

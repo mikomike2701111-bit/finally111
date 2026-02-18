@@ -38,7 +38,8 @@ export default function UnisexPage() {
     }
 
     try {
-      let q: Query<DocumentData> = query(collection(firestore, 'products'), where('category', '==', 'Children'));
+      // Changed query to 'Unisex' as requested
+      let q: Query<DocumentData> = query(collection(firestore, 'products'), where('category', '==', 'Unisex'));
 
       if (activeTab.toLowerCase() !== 'all') {
         q = query(q, where('style', '==', activeTab.toLowerCase()));
@@ -101,7 +102,9 @@ export default function UnisexPage() {
             Discover versatile pieces designed for inclusive expression. A focus on shared style and modern comfort.
           </p>
           <div className="flex items-center gap-4 opacity-0 animate-float-in [animation-delay:300ms]">
-            <Button size="lg" variant="secondary" className="rounded-full">Explore</Button>
+            <Link href="/unisex">
+              <Button size="lg" variant="secondary" className="rounded-full">Explore</Button>
+            </Link>
             <Button variant="ghost" className="flex items-center gap-2 text-white hover:bg-white/10">
               Scroll <ArrowRight size={16} />
             </Button>

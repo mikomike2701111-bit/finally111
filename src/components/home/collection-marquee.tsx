@@ -14,7 +14,7 @@ const collections = [
   {
     title: 'UNISEX',
     items: ['Sweaters', 'Accessories', 'Casual Wear', 'Outerwear'],
-    href: '/children',
+    href: '/unisex',
     style: {},
     imageHint: 'marquee-unisex',
     isImage: true,
