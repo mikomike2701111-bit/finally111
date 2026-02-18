@@ -44,7 +44,7 @@ const COLOR_PALETTE = [
   { name: 'Crimson', hex: '#DC143C' }, { name: 'Amber', hex: '#FFBF00' }, { name: 'Violet', hex: '#EE82EE' },
   { name: 'Fuchsia', hex: '#FF00FF' }, { name: 'Mint', hex: '#98FF98' }, { name: 'Mauve', hex: '#E0B0FF' },
   { name: 'Ivory', hex: '#FFFFF0' }, { name: 'Coral', hex: '#FF7F50' }, { name: 'Khaki', hex: '#F0E68C' },
-  { name: 'Cyan', hex: '#00FFFF' }, { name: 'Magenta', hex: '#FF00FF' }, { name: 'Silver', hex: '#C0C0C0' },
+  { name: 'Cyan', hex: '#00FFFF' }, { name: 'Magenta', hex: '#FF00EF' }, { name: 'Silver', hex: '#C0C0C0' },
   { name: 'Gold', hex: '#FFD700' }, { name: 'Bronze', hex: '#CD7F32' }, { name: 'Copper', hex: '#B87333' },
   { name: 'Rust', hex: '#B7410E' }
 ];
@@ -416,7 +416,7 @@ function DashboardContent() {
                       const isSelected = field.value?.some(c => c.hex === color.hex);
                       return (
                         <button
-                          key={color.hex}
+                          key={color.name}
                           type="button"
                           title={color.name}
                           onClick={() => {
@@ -490,7 +490,7 @@ function DashboardContent() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 
                 {/* Floating white description at bottom left */}
-                <div className="absolute bottom-4 left-4 right-4 z-10 pointer-events-none">
+                <div className="absolute bottom-4 left-4 z-10 pointer-events-none max-w-[80%]">
                     <p className="text-white text-xs font-medium line-clamp-2 drop-shadow-md">
                         {product.description}
                     </p>
