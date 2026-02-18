@@ -1,13 +1,8 @@
 # 🚀 Deployment Guide
 
-Follow these steps to push your changes to GitHub and deploy to Vercel.
+Run these commands in your terminal one by one to push your changes to GitHub.
 
-### 1. Get Your GitHub Token
-If you don't have one, create it here: [**github.com/settings/tokens/new**](https://github.com/settings/tokens/new)
-*Check the **'repo'** box when creating it.*
-
-### 2. Standard Push (Prompts for Token)
-Run these commands in your terminal. When it asks for your **Username**, type `mikomikE254254`. When it asks for your **Password**, paste your **Personal Access Token**.
+### Terminal Commands
 
 ```bash
 git init
@@ -20,20 +15,24 @@ git push -u origin main
 
 ---
 
-## ⚙️ How to get your API Keys
+### 💡 Authentication Help
+When you run `git push`, it will ask for:
+- **Username:** `mikomikE254254`
+- **Password:** Paste your **Personal Access Token** (NOT your GitHub password).
 
-| Key Name | Where to find it |
-| :--- | :--- |
-| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack Dashboard > Settings > API Keys & Webhooks |
-| `PAYSTACK_SECRET_KEY` | Paystack Dashboard > Settings > API Keys & Webhooks |
-| `GOOGLE_GENAI_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
-| `FIREBASE_SERVICE_ACCOUNT` | Firebase Console > Project Settings > Service Accounts > Generate new private key |
-| `NEXT_PUBLIC_FIREBASE_*` | Firebase Console > Project Settings > General > Your Apps (Web App) |
+**Generate a token here if you don't have one:** [github.com/settings/tokens/new](https://github.com/settings/tokens/new)
+*(Make sure to check the **'repo'** box when creating it!)*
 
 ---
 
-## 🎨 Vercel Environment Setup
+## ⚙️ Environment Setup for Vercel
 
-When you connect this repository to **Vercel**, you must add your keys in the **Settings > Environment Variables** section. Copy them from your local `.env` file. 
+Add these keys to your Vercel project **Settings > Environment Variables**:
 
-**Pro Tip**: You can copy the entire content of your `.env` and paste it into the first key field on Vercel, and it will automatically split them for you!
+| Key Name | Value Source |
+| :--- | :--- |
+| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack Dashboard |
+| `PAYSTACK_SECRET_KEY` | Paystack Dashboard |
+| `GOOGLE_GENAI_API_KEY` | Google AI Studio |
+| `FIREBASE_SERVICE_ACCOUNT` | Firebase JSON Key |
+| `NEXT_PUBLIC_ADMIN_EMAIL` | `admin@runway.com` |
