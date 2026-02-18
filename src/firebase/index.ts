@@ -3,21 +3,35 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore } from 'firebase/firestore';
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
+/**
+ * Initializes Firebase SDKs. 
+ * Includes a safety check for the API Key to prevent crashes during builds 
+ * when environment variables might not be fully populated.
+ */
 export function initializeFirebase() {
   if (!getApps().length) {
-    let firebaseApp;
-    // On Vercel or other platforms, we prioritize the config object unless it's Firebase App Hosting
+    let firebaseApp: FirebaseApp;
+
+    // Check if we have at least the API Key before attempting manual initialization
+    const hasConfig = !!firebaseConfig.apiKey;
+
     if (process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
       firebaseApp = initializeApp(firebaseConfig);
     } else {
       try {
+        // Attempt automatic initialization (works on Firebase Hosting)
         firebaseApp = initializeApp();
       } catch (e) {
-        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
-        firebaseApp = initializeApp(firebaseConfig);
+        if (hasConfig) {
+          console.warn('Automatic initialization failed. Falling back to local config.');
+          firebaseApp = initializeApp(firebaseConfig);
+        } else {
+          console.error('Firebase Configuration is missing! Please set your environment variables.');
+          // Initialize with empty config to prevent hard crash, though services will fail
+          firebaseApp = initializeApp(firebaseConfig);
+        }
       }
     }
 

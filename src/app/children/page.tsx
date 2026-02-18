@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const PAGE_SIZE = 8;
 
-export default function UnisexPage() {
+export default function ChildrenPage() {
   const [activeTab, setActiveTab] = useState("All");
   const heroImage = PlaceHolderImages.find(p => p.id === 'unisex-editorial-hero');
   
@@ -39,7 +39,7 @@ export default function UnisexPage() {
     }
 
     try {
-      let q: Query<DocumentData> = query(collection(firestore, 'products'), where('category', '==', 'Unisex'));
+      let q: Query<DocumentData> = query(collection(firestore, 'products'), where('category', '==', 'Children'));
 
       if (activeTab.toLowerCase() !== 'all') {
         q = query(q, where('style', '==', activeTab));
@@ -61,7 +61,6 @@ export default function UnisexPage() {
       setLastVisible(lastDoc || null);
       setProducts(currentProducts => {
         const combined = isNewQuery ? newProducts : [...currentProducts, ...newProducts];
-        combined.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         return combined;
       });
     } catch (error) {
@@ -94,16 +93,16 @@ export default function UnisexPage() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/20" />
         <div className="relative z-10 flex flex-col gap-6 items-center text-white p-8">
-          <div className="opacity-0 animate-float-in">
+          <div>
             <p className="text-sm font-medium text-gray-300">Featured</p>
-            <h1 className="text-3xl lg:text-4xl font-bold leading-tight mt-1">New arrivals and editor picks</h1>
+            <h1 className="text-3xl lg:text-4xl font-bold leading-tight mt-1">New arrivals for little ones</h1>
           </div>
-          <p className="text-gray-200 opacity-0 animate-float-in [animation-delay:150ms] max-w-2xl">
-            Discover versatile pieces designed for inclusive expression. A focus on shared style and modern comfort.
+          <p className="text-gray-200 max-w-2xl">
+            Discover comfortable and stylish pieces designed for active play and modern comfort.
           </p>
-          <div className="flex items-center gap-4 opacity-0 animate-float-in [animation-delay:300ms]">
-            <Link href="/unisex">
-              <Button size="lg" variant="secondary" className="rounded-full">Explore</Button>
+          <div className="flex items-center gap-4">
+            <Link href="/children">
+              <Button size="lg" variant="secondary" className="rounded-full">Explore All</Button>
             </Link>
             <Button variant="ghost" className="flex items-center gap-2 text-white hover:bg-white/10">
               Scroll <ArrowRight size={16} />
@@ -119,7 +118,7 @@ export default function UnisexPage() {
           {products.map(product => (
             <ProductCard key={product.id} product={product} />
           ))}
-          {!isLoading && products.length === 0 && <p>No products found in this category.</p>}
+          {!isLoading && products.length === 0 && <p className="text-muted-foreground text-center col-span-full py-12">No products found in this category.</p>}
         </div>
          <div className="flex justify-center mt-10">
           {hasMore && (
