@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Trash, Edit, Copy, Star, PlusCircle, LogOut, AlertCircle, ShoppingBag, Package, CheckCircle2 } from 'lucide-react';
+import { Trash, Edit, Copy, Star, PlusCircle, LogOut, AlertCircle, ShoppingBag, Package, CheckCircle2, Check } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
@@ -26,8 +26,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from '@/lib/utils';
 
 const AVAILABLE_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+const COLOR_PALETTE = [
+  { name: 'Black', hex: '#000000' }, { name: 'White', hex: '#FFFFFF' }, { name: 'Stone', hex: '#A8A29E' },
+  { name: 'Gray', hex: '#808080' }, { name: 'Red', hex: '#FF0000' }, { name: 'Pink', hex: '#FFC0CB' },
+  { name: 'Blue', hex: '#0000FF' }, { name: 'Sky', hex: '#87CEEB' }, { name: 'Green', hex: '#008000' },
+  { name: 'Lime', hex: '#00FF00' }, { name: 'Yellow', hex: '#FFFF00' }, { name: 'Orange', hex: '#FFA500' },
+  { name: 'Brown', hex: '#A52A2A' }, { name: 'Beige', hex: '#F5F5DC' }, { name: 'Purple', hex: '#800080' },
+  { name: 'Indigo', hex: '#4B0082' }, { name: 'Sage', hex: '#9C9F84' }, { name: 'Olive', hex: '#808000' },
+  { name: 'Terracotta', hex: '#E2725B' }, { name: 'Ochre', hex: '#CC7722' }, { name: 'Sand', hex: '#C2B280' },
+  { name: 'Taupe', hex: '#483C32' }, { name: 'Charcoal', hex: '#36454F' }, { name: 'Slate', hex: '#708090' },
+  { name: 'Navy', hex: '#000080' }, { name: 'Maroon', hex: '#800000' }, { name: 'Forest', hex: '#228B22' },
+  { name: 'Zinc', hex: '#71717A' }, { name: 'Teal', hex: '#008080' }, { name: 'Emerald', hex: '#50C878' },
+  { name: 'Crimson', hex: '#DC143C' }, { name: 'Amber', hex: '#FFBF00' }, { name: 'Violet', hex: '#EE82EE' },
+  { name: 'Fuchsia', hex: '#FF00FF' }, { name: 'Mint', hex: '#98FF98' }, { name: 'Mauve', hex: '#E0B0FF' },
+  { name: 'Ivory', hex: '#FFFFF0' }, { name: 'Coral', hex: '#FF7F50' }, { name: 'Khaki', hex: '#F0E68C' },
+  { name: 'Cyan', hex: '#00FFFF' }, { name: 'Magenta', hex: '#FF00FF' }, { name: 'Silver', hex: '#C0C0C0' },
+  { name: 'Gold', hex: '#FFD700' }, { name: 'Bronze', hex: '#CD7F32' }, { name: 'Copper', hex: '#B87333' },
+  { name: 'Rust', hex: '#B7410E' }
+];
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -118,7 +138,7 @@ function DashboardContent() {
     const uploadTask = uploadBytesResumable(storageRef, file);
 
     setUploading(true);
-    setUploadedUrl(null);
+    setUploadProgress(0);
 
     uploadTask.on('state_changed',
         (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
@@ -232,10 +252,7 @@ function DashboardContent() {
   const handleUpdateOrderStatus = (orderId: string, status: Order['status']) => {
     if (!firestore) return;
     updateDocumentNonBlocking(doc(firestore, 'orders', orderId), { status });
-    toast({
-      title: 'Order Status Updated',
-      description: `Order has been set to ${status}.`
-    })
+    toast({ title: 'Order Status Updated' });
   };
 
   const handleLogout = async () => {
@@ -391,6 +408,39 @@ function DashboardContent() {
 
               <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel className="font-bold">Description</FormLabel><FormControl><Textarea {...field} rows={4} className="rounded-xl" /></FormControl><FormMessage /></FormItem>)}/>
               
+              <FormField control={form.control} name="availableColors" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold">Available Colors</FormLabel>
+                  <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 p-4 border rounded-2xl bg-gray-50">
+                    {COLOR_PALETTE.map((color) => {
+                      const isSelected = field.value?.some(c => c.hex === color.hex);
+                      return (
+                        <button
+                          key={color.hex}
+                          type="button"
+                          title={color.name}
+                          onClick={() => {
+                            const current = field.value || [];
+                            const updated = isSelected 
+                              ? current.filter(c => c.hex !== color.hex)
+                              : [...current, color];
+                            field.onChange(updated);
+                          }}
+                          className={cn(
+                            "w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center relative",
+                            isSelected ? "border-black scale-110 shadow-md" : "border-transparent hover:border-gray-300"
+                          )}
+                          style={{ backgroundColor: color.hex }}
+                        >
+                          {isSelected && <Check className={cn("h-4 w-4", color.name === 'White' || color.name === 'Beige' || color.name === 'Ivory' || color.name === 'Yellow' ? "text-black" : "text-white")} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <FormDescription>Select all colors available for this product.</FormDescription>
+                </FormItem>
+              )} />
+
               <FormField control={form.control} name="sizes" render={() => (
                 <FormItem>
                     <FormLabel className="font-bold">Available Sizes</FormLabel>
@@ -432,18 +482,27 @@ function DashboardContent() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {isLoadingProducts && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-64 rounded-3xl" />)}
         {products?.map(product => (
-          <Card key={product.id} className="group border-2 border-black rounded-3xl overflow-hidden hover:shadow-xl transition-all">
+          <Card key={product.id} className="group border-2 border-black rounded-3xl overflow-hidden hover:shadow-xl transition-all relative">
             <div className="aspect-[4/5] relative bg-gray-100">
                 {product.images?.[0]?.url && (
                     <img src={product.images[0].url} alt={product.name} className="w-full h-full object-cover" />
                 )}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-2">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                
+                {/* Floating white description at bottom left */}
+                <div className="absolute bottom-4 left-4 right-4 z-10 pointer-events-none">
+                    <p className="text-white text-xs font-medium line-clamp-2 drop-shadow-md">
+                        {product.description}
+                    </p>
+                </div>
+
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-2 z-20">
                     <Button variant="secondary" size="icon" className="rounded-full h-9 w-9 shadow-md" onClick={() => openEditDialog(product)}><Edit className="h-4 w-4" /></Button>
                     <Button variant="destructive" size="icon" className="rounded-full h-9 w-9 shadow-md" onClick={() => handleDelete(product.id)}><Trash className="h-4 w-4" /></Button>
                 </div>
-                {product.isFeatured && <div className="absolute top-2 left-2 bg-yellow-400 p-1.5 rounded-full shadow-md"><Star className="h-4 w-4 fill-black" /></div>}
+                {product.isFeatured && <div className="absolute top-2 left-2 bg-yellow-400 p-1.5 rounded-full shadow-md z-20"><Star className="h-4 w-4 fill-black" /></div>}
             </div>
-            <CardContent className="p-4">
+            <CardContent className="p-4 bg-white">
               <div className="flex justify-between items-start gap-2">
                 <h3 className="font-bold truncate text-sm flex-grow">{product.name}</h3>
                 <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full uppercase font-bold">{product.category}</span>
