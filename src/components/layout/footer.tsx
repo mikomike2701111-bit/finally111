@@ -4,10 +4,17 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Facebook, Twitter, Instagram, Linkedin, Phone, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
 
 export default function Footer() {
   const pathname = usePathname();
-  const isAdminVisible = pathname === '/bags';
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const isAdminVisible = isMounted && pathname === '/bags';
 
   return (
     <footer className="bg-background text-black py-12 px-6 sm:px-12 lg:px-20">
