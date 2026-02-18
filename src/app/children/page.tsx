@@ -61,7 +61,6 @@ export default function UnisexPage() {
       setLastVisible(lastDoc || null);
       setProducts(currentProducts => {
         const combined = isNewQuery ? newProducts : [...currentProducts, ...newProducts];
-        // Ensure name exists before sorting to avoid crashes
         combined.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         return combined;
       });
