@@ -14,10 +14,11 @@ export default function Footer() {
     setIsMounted(true);
   }, []);
 
+  // Hydration safety: only check path on client to avoid mismatch
   const isAdminVisible = isMounted && pathname === '/bags';
 
   return (
-    <footer className="bg-background text-black py-12 px-6 sm:px-12 lg:px-20">
+    <footer className="bg-background text-black pt-12 pb-16 px-6 sm:px-12 lg:px-20">
       <div className="space-y-6 max-w-7xl mx-auto">
 
         {/* Top Segment */}
