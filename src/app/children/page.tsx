@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import ProductCard from "@/components/product/product-card";
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { ArrowRight } from 'lucide-react';
 import CategoryTabs from '@/components/product/category-tabs';
 import { useFirestore } from '@/firebase';
 import type { Product } from '@/lib/types';
-import { collection, query, where, getDocs, limit, startAfter, orderBy, DocumentData, DocumentSnapshot, Query } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, startAfter, DocumentData, DocumentSnapshot, Query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const PAGE_SIZE = 8;
@@ -38,7 +39,6 @@ export default function UnisexPage() {
     }
 
     try {
-      // Changed query to 'Unisex' as requested
       let q: Query<DocumentData> = query(collection(firestore, 'products'), where('category', '==', 'Unisex'));
 
       if (activeTab.toLowerCase() !== 'all') {
