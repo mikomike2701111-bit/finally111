@@ -25,6 +25,8 @@ NEXT_PUBLIC_ADMIN_EMAIL="admin@runway.com"
 
 ## How to Push Your Code to GitHub
 
+Follow these steps exactly to upload your changes.
+
 **1. Initialize Git**
 ```sh
 git init
@@ -48,7 +50,9 @@ git push -u origin main
 ```
 
 ### Authentication
-When asked for your **Password**, paste your **Personal Access Token (PAT)** from the link above. DO NOT use your GitHub account password.
+When asked for your **Username**, enter `mikomikE254254`.
+When asked for your **Password**, paste your **Personal Access Token (PAT)**. 
+**DO NOT** use your regular GitHub account password.
 
 ---
 
