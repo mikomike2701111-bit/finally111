@@ -1,22 +1,21 @@
+# 🚀 Deployment Guide
 
-# 🚀 Fast Deployment Guide
-
-Follow these steps to upload your changes to GitHub and deploy to Vercel.
+Follow these steps to push your changes to GitHub and deploy to Vercel.
 
 ### 1. Get Your GitHub Token
 If you don't have one, create it here: [**github.com/settings/tokens/new**](https://github.com/settings/tokens/new)
 *Check the **'repo'** box when creating it.*
 
-### 2. Copy & Paste These Commands
-Run these in your terminal one by one. Replace `PASTE_YOUR_TOKEN_HERE` with your actual token in the last command.
+### 2. Standard Push (Prompts for Token)
+Run these commands in your terminal. When it asks for your **Username**, type `mikomikE254254`. When it asks for your **Password**, paste your **Personal Access Token**.
 
 ```bash
 git init
 git add .
-git commit -m "Finalizing environment setup and UI updates"
+git commit -m "Fix build errors and update UI"
 git branch -M main
-# This next command is the one that uses your token:
-git push https://mikomikE254254:PASTE_YOUR_TOKEN_HERE@github.com/mikomikE254254/finally111.git main --force
+git remote set-url origin https://github.com/mikomikE254254/finally111.git
+git push -u origin main
 ```
 
 ---
