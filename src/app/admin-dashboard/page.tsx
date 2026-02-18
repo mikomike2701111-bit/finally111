@@ -416,7 +416,7 @@ function DashboardContent() {
                       const isSelected = field.value?.some(c => c.hex === color.hex);
                       return (
                         <button
-                          key={color.name}
+                          key={`${color.name}-${color.hex}`}
                           type="button"
                           title={color.name}
                           onClick={() => {

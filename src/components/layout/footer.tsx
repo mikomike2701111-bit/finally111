@@ -14,11 +14,11 @@ export default function Footer() {
     setIsMounted(true);
   }, []);
 
-  // Hydration safety: only check path on client to avoid mismatch
+  // Show admin button ONLY on the Bags page
   const isAdminVisible = isMounted && pathname === '/bags';
 
   return (
-    <footer className="bg-background text-black pt-12 pb-16 px-6 sm:px-12 lg:px-20">
+    <footer className="bg-background text-black pt-12 px-6 sm:px-12 lg:px-20 pb-[74px]">
       <div className="space-y-6 max-w-7xl mx-auto">
 
         {/* Top Segment */}
@@ -50,6 +50,7 @@ export default function Footer() {
               src="https://www.google.com/maps?q=Runda%20Mall,Nairobi&output=embed"
               loading="lazy"
               className="w-full h-full border-0"
+              title="Eddjos Location"
             ></iframe>
           </div>
         </div>
