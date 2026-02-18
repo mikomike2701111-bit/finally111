@@ -108,8 +108,8 @@ function DashboardContent() {
     }, { totalSales: 0, pendingOrders: 0, totalRevenue: 0 });
   }, [orders]);
 
-  const sortedCategories = useMemo(() => categories?.sort((a, b) => a.name.compare(b.name)) || [], [categories]);
-  const sortedStyles = useMemo(() => styles?.sort((a, b) => a.name.compare(b.name)) || [], [styles]);
+  const sortedCategories = useMemo(() => categories?.sort((a, b) => a.name.localeCompare(b.name)) || [], [categories]);
+  const sortedStyles = useMemo(() => styles?.sort((a, b) => a.name.localeCompare(b.name)) || [], [styles]);
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
