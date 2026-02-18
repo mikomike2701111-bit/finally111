@@ -141,7 +141,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
               <div className="flex items-center gap-3">
                 {colorOptions.map((color) => (
                   <button 
-                    key={color.name} 
+                    key={`${color.name}-${color.hex}`} 
                     onClick={() => setSelectedColor(color.hex)} 
                     className={cn(
                       "w-8 h-8 rounded-full border-2 transition-all p-0.5", 
