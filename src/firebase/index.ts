@@ -7,32 +7,19 @@ import { getFirestore } from 'firebase/firestore';
 
 /**
  * Initializes Firebase SDKs. 
- * Includes a safety check for the API Key to prevent crashes during builds 
- * when environment variables might not be fully populated.
  */
 export function initializeFirebase() {
   if (!getApps().length) {
     let firebaseApp: FirebaseApp;
 
-    // Check if we have at least the API Key before attempting manual initialization
-    const hasConfig = !!firebaseConfig.apiKey;
-
-    if (process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+    // Check if we have at least the API Key before attempting initialization
+    if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'undefined') {
       firebaseApp = initializeApp(firebaseConfig);
     } else {
-      try {
-        // Attempt automatic initialization (works on Firebase Hosting)
-        firebaseApp = initializeApp();
-      } catch (e) {
-        if (hasConfig) {
-          console.warn('Automatic initialization failed. Falling back to local config.');
-          firebaseApp = initializeApp(firebaseConfig);
-        } else {
-          console.error('Firebase Configuration is missing! Please set your environment variables.');
-          // Initialize with empty config to prevent hard crash, though services will fail
-          firebaseApp = initializeApp(firebaseConfig);
-        }
-      }
+      // In build environments like Vercel, keys might be missing during pre-rendering.
+      // We initialize with an empty shell to prevent hard crashes during build.
+      console.warn('Firebase API Key is missing. Check your environment variables.');
+      firebaseApp = initializeApp({ ...firebaseConfig, apiKey: 'MISSING_KEY' });
     }
 
     return getSdks(firebaseApp);
