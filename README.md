@@ -21,22 +21,20 @@ git push https://mikomikE254254:PASTE_YOUR_TOKEN_HERE@github.com/mikomikE254254/
 
 ---
 
-## ⚙️ Vercel Environment Setup
+## ⚙️ How to get your API Keys
 
-When you connect this repository to **Vercel**, you must add your keys in the **Settings > Environment Variables** section. Copy them from your local `.env` file:
-
-| Key | Description |
+| Key Name | Where to find it |
 | :--- | :--- |
-| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Your Paystack Public Key |
-| `PAYSTACK_SECRET_KEY` | Your Paystack Secret Key |
-| `FIREBASE_SERVICE_ACCOUNT` | The entire JSON string from your Firebase Service Account file |
-| `GOOGLE_GENAI_API_KEY` | Your Gemini API Key for AI features |
-| `NEXT_PUBLIC_ADMIN_EMAIL` | The email authorized to access the admin dashboard |
+| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack Dashboard > Settings > API Keys & Webhooks |
+| `PAYSTACK_SECRET_KEY` | Paystack Dashboard > Settings > API Keys & Webhooks |
+| `GOOGLE_GENAI_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| `FIREBASE_SERVICE_ACCOUNT` | Firebase Console > Project Settings > Service Accounts > Generate new private key |
+| `NEXT_PUBLIC_FIREBASE_*` | Firebase Console > Project Settings > General > Your Apps (Web App) |
 
 ---
 
-## 🎨 UI Standards Applied
-- **Straight Text**: No italics used anywhere ("no bending").
-- **Card Aspect**: 4/5.5 ratio for an elegant silhouette.
-- **Glassmorphism**: 25% transparent info bubbles on product cards.
-- **Security**: Admin dashboard locked to authorized email only.
+## 🎨 Vercel Environment Setup
+
+When you connect this repository to **Vercel**, you must add your keys in the **Settings > Environment Variables** section. Copy them from your local `.env` file. 
+
+**Pro Tip**: You can copy the entire content of your `.env` and paste it into the first key field on Vercel, and it will automatically split them for you!
