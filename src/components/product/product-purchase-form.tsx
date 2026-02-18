@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import type { Product } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Minus, Plus, LoaderCircle } from 'lucide-react';
+import { Minus, Plus, LoaderCircle, CheckCircle2 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { cn } from '@/lib/utils';
 import { usePaystackPayment } from 'react-paystack';
@@ -16,7 +16,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { verifyPayment } from '@/ai/flows/verify-payment';
-
 
 interface ProductPurchaseFormProps {
   product: Product;
@@ -37,11 +36,9 @@ const WhatsAppIcon = () => (
 const addressSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   phone: z.string().min(10, 'A valid phone number is required'),
-  description: z.string().min(1, 'Address is required'),
+  description: z.string().min(1, 'Delivery address is required'),
 });
 type AddressFormData = z.infer<typeof addressSchema>;
-
-const fallbackColors = ['#111827', '#f9fafb', '#4b5563', '#9ca3af'];
 
 export default function ProductPurchaseForm({ product, selectedColor, setSelectedColor }: ProductPurchaseFormProps) {
   const { addToCart, toggleWishlist, isProductInWishlist } = useAppContext();
@@ -49,6 +46,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   const [quantity, setQuantity] = useState(1);
   const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const isInWishlist = isProductInWishlist(product.id);
   const { toast } = useToast();
@@ -63,7 +61,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   const watchedName = addressForm.watch('name');
   const watchedDescription = addressForm.watch('description');
   
-  const config = useMemo(() => ({
+  const paystackConfig = useMemo(() => ({
     reference: (new Date()).getTime().toString(),
     email: "customer@runway.com",
     amount: product.price * quantity * 100,
@@ -75,16 +73,10 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
       size: selectedSize,
       customerName: watchedName,
       customerPhone: watchedPhone,
-      custom_fields: [
-        { display_name: "Product", variable_name: "product", value: product.name },
-        { display_name: "Quantity", variable_name: "quantity", value: quantity },
-        { display_name: "Size", variable_name: "size", value: selectedSize },
-        { display_name: "Address", variable_name: "address", value: watchedDescription }
-      ]
     }
-  }), [product, quantity, selectedSize, watchedPhone, watchedName, watchedDescription]);
+  }), [product, quantity, selectedSize, watchedPhone, watchedName]);
 
-  const initializePayment = usePaystackPayment(config);
+  const initializePayment = usePaystackPayment(paystackConfig);
 
   const onPaymentSuccess = async (reference: any) => {
     setIsVerifying(true);
@@ -98,10 +90,14 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
     try {
       const result = await verifyPayment({ reference: reference.reference, orderPayload });
       if (result.success) {
-        toast({ title: "Order Placed!", description: "Payment verified successfully." });
-        setIsAddressDialogOpen(false);
+        setPaymentSuccess(true);
+        toast({ title: "Order Confirmed!", description: "Your payment has been verified." });
+        setTimeout(() => {
+          setIsAddressDialogOpen(false);
+          setPaymentSuccess(false);
+        }, 2000);
       } else {
-        toast({ variant: "destructive", title: "Error", description: result.message });
+        toast({ variant: "destructive", title: "Verification Failed", description: result.message });
       }
     } catch (error) {
       console.error("Verification error:", error);
@@ -112,53 +108,37 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   };
 
   const handleAddressSubmit = (data: AddressFormData) => {
-    initializePayment(onPaymentSuccess, () => {});
+    initializePayment(onPaymentSuccess);
   };
 
-  const colorOptions = product.availableColors || fallbackColors.map(hex => ({ name: hex, hex }));
+  const colorOptions = product.availableColors || [];
   const availableSizes = product.sizes || ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
   return (
     <>
-    <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-gray-100 space-y-8 relative overflow-hidden">
-      {isVerifying && (
-        <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
-          <LoaderCircle className="w-12 h-12 animate-spin text-primary" />
-          <p className="font-bold text-lg">Verifying Payment...</p>
-        </div>
-      )}
-      
-      <div className="flex justify-between items-start gap-4">
+      <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
         <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">{product.name}</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900">{product.name}</h1>
             <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full uppercase tracking-wider">{product.category}</span>
-                {product.style && <span className="text-xs font-semibold bg-yellow-100 text-yellow-800 px-2.5 py-1 rounded-full uppercase tracking-wider">{product.style}</span>}
+                <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full uppercase tracking-widest">{product.category}</span>
+                {product.style && (
+                  <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full uppercase tracking-widest border border-blue-100">
+                    {product.style}
+                  </span>
+                )}
             </div>
         </div>
-        <button 
-          onClick={() => toggleWishlist(product.id)} 
-          className={cn(
-            "p-3 rounded-full border transition-all hover:bg-gray-50",
-            isInWishlist ? "bg-red-50 border-red-200 text-red-500" : "bg-white border-gray-200 text-gray-400"
-          )} 
-          aria-label="Wishlist"
-        >
-          <svg viewBox="0 0 24 24" fill={isInWishlist ? "currentColor" : "none"} className="w-6 h-6">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" strokeWidth="2"/>
-          </svg>
-        </button>
-      </div>
 
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-900">Description</h3>
-        <p className="text-base leading-relaxed text-gray-600">{product.description}</p>
-      </div>
+        {/* Description First */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Product Story</h3>
+          <p className="text-sm leading-relaxed text-gray-600 font-medium">{product.description}</p>
+        </div>
 
-      <div className="space-y-6 pt-4 border-t border-gray-100">
+        <div className="pt-4 border-t border-gray-50 space-y-6">
           {colorOptions.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Color</h3>
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Color Palette</h3>
               <div className="flex items-center gap-3">
                 {colorOptions.map((color) => (
                   <button 
@@ -166,10 +146,10 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
                     onClick={() => setSelectedColor(color.hex)} 
                     className={cn(
                       "w-8 h-8 rounded-full border-2 transition-all p-0.5", 
-                      selectedColor === color.hex ? 'border-primary' : 'border-transparent hover:border-gray-300'
+                      selectedColor === color.hex ? 'border-black scale-110 shadow-sm' : 'border-transparent hover:border-gray-200'
                     )}
                   >
-                    <div className="w-full h-full rounded-full" style={{ backgroundColor: color.hex }} />
+                    <div className="w-full h-full rounded-full border border-gray-100" style={{ backgroundColor: color.hex }} />
                   </button>
                 ))}
               </div>
@@ -177,17 +157,17 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
           )}
           
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Size</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Size Select</h3>
             <div className="flex flex-wrap gap-2">
               {availableSizes.map((size) => (
                 <button 
                   key={size} 
                   onClick={() => setSelectedSize(size)} 
                   className={cn(
-                    "min-w-[50px] h-10 px-4 rounded-xl text-sm font-medium transition-all border", 
+                    "min-w-[44px] h-10 px-3 rounded-xl text-xs font-bold transition-all border", 
                     selectedSize === size 
-                      ? 'bg-black text-white border-black' 
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                      ? 'bg-black text-white border-black shadow-md' 
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
                   )}
                 >
                   {size}
@@ -196,73 +176,86 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
             </div>
           </div>
 
-          <div className="flex items-center justify-between py-2">
-            <h3 className="text-sm font-semibold text-gray-900">Quantity</h3>
-            <div className="flex items-center gap-4 bg-gray-100 rounded-full px-1 py-1">
-                <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 hover:bg-white" onClick={() => setQuantity(q => Math.max(1, q - 1))}><Minus className="w-3 h-3" /></Button>
-                <span className="w-6 text-center font-bold">{quantity}</span>
-                <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 hover:bg-white" onClick={() => setQuantity(q => q + 1)}><Plus className="w-3 h-3" /></Button>
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Quantity</h3>
+            <div className="flex items-center gap-3 bg-gray-50 rounded-full px-1 py-1 border">
+                <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={() => setQuantity(q => Math.max(1, q - 1))}><Minus className="w-3 h-3" /></Button>
+                <span className="w-6 text-center font-black text-sm">{quantity}</span>
+                <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={() => setQuantity(q => q + 1)}><Plus className="w-3 h-3" /></Button>
             </div>
           </div>
-      </div>
-      
-      <div className="space-y-4 pt-6 border-t border-gray-100">
-        <div className="flex justify-between items-end mb-2">
-            <span className="text-sm font-medium text-gray-500">Total Price</span>
-            <p className="text-3xl font-bold text-gray-900">Ksh {(product.price * quantity).toLocaleString()}</p>
         </div>
         
-        <div className="flex flex-col gap-3">
-            <Button size="lg" className="w-full rounded-2xl h-14 text-lg font-bold shadow-sm" onClick={() => addToCart(product, quantity)}>Add to Bag</Button>
-            <Button size="lg" variant="secondary" className="w-full rounded-2xl h-14 text-lg font-bold border border-gray-200" onClick={() => setIsAddressDialogOpen(true)}>
-                Buy Now
-            </Button>
-            <Button size="lg" variant="tactile-green" className="w-full rounded-2xl h-14 text-lg font-bold shadow-sm flex items-center justify-center gap-2" onClick={() => {
-                const message = `Hi Eddjos, I want to buy ${quantity}x ${product.name} in Size ${selectedSize}. Total: Ksh ${(product.price * quantity).toLocaleString()}.`;
-                window.open(`https://wa.me/254740685488?text=${encodeURIComponent(message)}`, '_blank');
-            }}>
-                <WhatsAppIcon />
-                Order on WhatsApp
-            </Button>
+        {/* Price and Buttons */}
+        <div className="pt-6 border-t border-gray-50 space-y-4">
+          <div className="flex justify-between items-end mb-2">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Investment</span>
+              <p className="text-2xl font-black text-gray-900">Ksh {(product.price * quantity).toLocaleString()}</p>
+          </div>
+          
+          <div className="flex flex-col gap-2">
+              <Button size="lg" className="w-full rounded-full h-12 font-bold shadow-sm" onClick={() => addToCart(product, quantity)}>Add to Bag</Button>
+              <Button size="lg" variant="secondary" className="w-full rounded-full h-12 font-bold border border-gray-200" onClick={() => setIsAddressDialogOpen(true)}>
+                  Direct Buy with Paystack
+              </Button>
+              <Button size="lg" variant="tactile-green" className="w-full rounded-full h-12 font-bold shadow-sm flex items-center justify-center gap-2" onClick={() => {
+                  const message = `Hi Eddjos, I want to buy ${quantity}x ${product.name} (Size: ${selectedSize}). Total: Ksh ${(product.price * quantity).toLocaleString()}.`;
+                  window.open(`https://wa.me/254740685488?text=${encodeURIComponent(message)}`, '_blank');
+              }}>
+                  <WhatsAppIcon />
+                  Order on WhatsApp
+              </Button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <Dialog open={isAddressDialogOpen} onOpenChange={(open) => !isVerifying && setIsAddressDialogOpen(open)}>
-        <DialogContent onPointerDownOutside={(e) => isVerifying && e.preventDefault()} className="rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-center">Delivery Details</DialogTitle>
-          </DialogHeader>
-          <Form {...addressForm}>
-            <form onSubmit={addressForm.handleSubmit(handleAddressSubmit)} className="space-y-4 py-4">
-                <FormField control={addressForm.control} name="name" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-semibold text-sm">Full Name</FormLabel>
-                    <FormControl><Input placeholder="John Doe" {...field} className="rounded-xl h-12" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}/>
-                <FormField control={addressForm.control} name="phone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-semibold text-sm">Phone Number</FormLabel>
-                    <FormControl><Input type="tel" {...field} className="rounded-xl h-12" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}/>
-              <FormField control={addressForm.control} name="description" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-semibold text-sm">Delivery Address</FormLabel>
-                  <FormControl><Textarea placeholder="Building, Estate, Apartment No." {...field} className="rounded-xl min-h-[100px]" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}/>
-              <DialogFooter className="mt-6">
-                <Button type="submit" size="lg" className="w-full rounded-2xl h-14 text-lg font-bold" disabled={!addressForm.formState.isValid || isVerifying}>
-                    {isVerifying ? <LoaderCircle className="animate-spin" /> : 'Confirm & Proceed'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+      <Dialog open={isAddressDialogOpen} onOpenChange={(open) => !isVerifying && setIsAddressDialogOpen(open)}>
+        <DialogContent onPointerDownOutside={(e) => isVerifying && e.preventDefault()} className="rounded-3xl border-2 border-black sm:max-w-md">
+          {paymentSuccess ? (
+            <div className="py-12 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-300">
+               <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <CheckCircle2 className="h-10 w-10 text-green-600" />
+               </div>
+               <h2 className="text-2xl font-black mb-2">Payment Confirmed!</h2>
+               <p className="text-gray-500 font-medium">Your order has been recorded. Redirecting...</p>
+            </div>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-xl font-black text-center">Delivery Details</DialogTitle>
+              </DialogHeader>
+              <Form {...addressForm}>
+                <form onSubmit={addressForm.handleSubmit(handleAddressSubmit)} className="space-y-4 py-4">
+                    <FormField control={addressForm.control} name="name" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="font-bold text-xs uppercase tracking-tighter">Recipient Name</FormLabel>
+                        <FormControl><Input placeholder="Jane Doe" {...field} className="rounded-xl h-11 border-2" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}/>
+                    <FormField control={addressForm.control} name="phone" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="font-bold text-xs uppercase tracking-tighter">Phone Contact</FormLabel>
+                        <FormControl><Input type="tel" {...field} className="rounded-xl h-11 border-2" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}/>
+                  <FormField control={addressForm.control} name="description" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-bold text-xs uppercase tracking-tighter">Shipping Address</FormLabel>
+                      <FormControl><Textarea placeholder="Apartment, Street, Town..." {...field} className="rounded-xl min-h-[80px] border-2" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}/>
+                  <DialogFooter className="mt-6">
+                    <Button type="submit" size="lg" className="w-full rounded-full h-12 font-bold shadow-lg" disabled={!addressForm.formState.isValid || isVerifying}>
+                        {isVerifying ? <LoaderCircle className="animate-spin" /> : 'Confirm & Proceed to Paystack'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>

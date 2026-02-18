@@ -5,8 +5,7 @@ import { useAppContext } from '@/context/AppContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { Minus, Plus, ShoppingBag, X, LoaderCircle } from 'lucide-react';
-import Link from 'next/link';
+import { Minus, Plus, ShoppingBag, X, LoaderCircle, CheckCircle2 } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -31,14 +30,15 @@ const WhatsAppIcon = () => (
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   phone: z.string().min(10, 'A valid phone number is required'),
-  description: z.string().min(1, 'Address description is required'),
+  description: z.string().min(1, 'Delivery address is required'),
 });
 type CheckoutFormData = z.infer<typeof checkoutSchema>;
 
 function CheckoutDialog() {
-  const { cart, cartCount, cartTotal, clearCart, setOpen: setCartOpen } = useAppContext();
+  const { cart, cartTotal, clearCart, setOpen: setCartOpen } = useAppContext();
   const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = React.useState(false);
   const [isVerifying, setIsVerifying] = React.useState(false);
+  const [paymentSuccess, setPaymentSuccess] = React.useState(false);
   const { toast } = useToast();
 
   const checkoutForm = useForm<CheckoutFormData>({
@@ -53,7 +53,7 @@ function CheckoutDialog() {
 
   const config = React.useMemo(() => ({
     reference: (new Date()).getTime().toString(),
-    email: "customer@runway.com", // Simplified email requirement
+    email: "customer@runway.com", 
     amount: cartTotal * 100,
     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
     currency: 'KES',
@@ -61,12 +61,8 @@ function CheckoutDialog() {
         cartItems: cart.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })),
         customerName: watchedName,
         customerPhone: watchedPhone,
-        custom_fields: [
-          { display_name: "Cart Total", variable_name: "cart_total", value: `Ksh ${cartTotal.toFixed(2)}`},
-          { display_name: "Address", variable_name: "address", value: watchedDescription }
-        ]
     }
-  }), [cart, cartTotal, watchedPhone, watchedName, watchedDescription]);
+  }), [cart, cartTotal, watchedPhone, watchedName]);
 
   const initializePayment = usePaystackPayment(config);
 
@@ -82,33 +78,36 @@ function CheckoutDialog() {
     try {
       const result = await verifyPayment({ reference: reference.reference, orderPayload });
       if (result.success) {
-        toast({ title: "Payment Successful!", description: "Order has been placed." });
-        clearCart();
-        setCartOpen(false);
-        setIsCheckoutDialogOpen(false);
+        setPaymentSuccess(true);
+        toast({ title: "Transaction Successful!", description: "Your order has been recorded." });
+        setTimeout(() => {
+          clearCart();
+          setCartOpen(false);
+          setIsCheckoutDialogOpen(false);
+          setPaymentSuccess(false);
+        }, 2000);
       } else {
-        toast({ variant: "destructive", title: "Payment Verification Failed", description: result.message });
+        toast({ variant: "destructive", title: "Verification Failed", description: result.message });
       }
     } catch (error) {
-      console.error("Verification flow error:", error);
-      toast({ variant: "destructive", title: "Verification Error", description: "A server error occurred." });
+      console.error("Verification error:", error);
+      toast({ variant: "destructive", title: "Error", description: "Payment verified but order failed to record." });
     } finally {
       setIsVerifying(false);
     }
   };
 
   const handleCheckoutSubmit = (data: CheckoutFormData) => {
-    // IMPORTANT: Keep dialog open to prevent payment popup from being blocked/closed
-    initializePayment(onPaymentSuccess, () => {});
+    initializePayment(onPaymentSuccess);
   };
   
   const handlePayNowClick = () => {
     if (cart.length === 0) {
-      toast({ variant: "destructive", title: "Cart is Empty" });
+      toast({ variant: "destructive", title: "Bag is Empty" });
       return;
     }
     if (!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) {
-      toast({ variant: "destructive", title: "Gateway Error", description: "Payment gateway key missing." });
+      toast({ variant: "destructive", title: "Configuration Error", description: "Payment key is missing." });
       return;
     }
     setIsCheckoutDialogOpen(true);
@@ -117,129 +116,144 @@ function CheckoutDialog() {
   return (
     <>
       <Button className="w-full h-12 rounded-full font-bold shadow-lg" size="lg" onClick={handlePayNowClick} disabled={isVerifying}>
-        {isVerifying ? 'Processing...' : 'Pay Now'}
+        {isVerifying ? 'Verifying...' : 'Pay with Paystack'}
       </Button>
       <Dialog open={isCheckoutDialogOpen} onOpenChange={(open) => !isVerifying && setIsCheckoutDialogOpen(open)}>
-        <DialogContent onPointerDownOutside={(e) => isVerifying && e.preventDefault()} className="rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black">Delivery Details</DialogTitle>
-          </DialogHeader>
-          <Form {...checkoutForm}>
-            <form onSubmit={checkoutForm.handleSubmit(handleCheckoutSubmit)} className="space-y-4 py-4">
-                <FormField control={checkoutForm.control} name="name" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-bold">Full Name</FormLabel>
-                    <FormControl><Input placeholder="Jane Doe" {...field} className="rounded-xl border-2" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}/>
-                <FormField control={checkoutForm.control} name="phone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-bold">Phone Number</FormLabel>
-                    <FormControl><Input type="tel" {...field} className="rounded-xl border-2" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}/>
-              <FormField control={checkoutForm.control} name="description" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-bold">Where should we deliver?</FormLabel>
-                  <FormControl><Textarea placeholder="Building, Street, House No." {...field} className="rounded-xl border-2" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}/>
-              <DialogFooter className="mt-4">
-                <Button type="submit" size="lg" className="w-full rounded-2xl h-14 text-lg font-bold shadow-xl" disabled={!checkoutForm.formState.isValid || isVerifying}>
-                    {isVerifying ? <LoaderCircle className="animate-spin" /> : 'Confirm & Proceed to Pay'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+        <DialogContent onPointerDownOutside={(e) => isVerifying && e.preventDefault()} className="rounded-3xl border-2 border-black sm:max-w-md">
+          {paymentSuccess ? (
+             <div className="py-12 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-300">
+                <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                   <CheckCircle2 className="h-10 w-10 text-green-600" />
+                </div>
+                <h2 className="text-2xl font-black mb-2">Success!</h2>
+                <p className="text-gray-500 font-medium">Payment received and order confirmed.</p>
+             </div>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-xl font-black text-center">Checkout Details</DialogTitle>
+              </DialogHeader>
+              <Form {...checkoutForm}>
+                <form onSubmit={checkoutForm.handleSubmit(handleCheckoutSubmit)} className="space-y-4 py-4">
+                    <FormField control={checkoutForm.control} name="name" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="font-bold text-xs uppercase tracking-tighter">Full Name</FormLabel>
+                        <FormControl><Input placeholder="Jane Doe" {...field} className="rounded-xl h-11 border-2" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}/>
+                    <FormField control={checkoutForm.control} name="phone" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="font-bold text-xs uppercase tracking-tighter">Phone Number</FormLabel>
+                        <FormControl><Input type="tel" {...field} className="rounded-xl h-11 border-2" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}/>
+                  <FormField control={checkoutForm.control} name="description" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-bold text-xs uppercase tracking-tighter">Delivery Address</FormLabel>
+                      <FormControl><Textarea placeholder="Where should we drop it off?" {...field} className="rounded-xl min-h-[80px] border-2" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}/>
+                  <DialogFooter className="mt-6">
+                    <Button type="submit" size="lg" className="w-full rounded-full h-12 font-bold shadow-lg" disabled={!checkoutForm.formState.isValid || isVerifying}>
+                        {isVerifying ? <LoaderCircle className="animate-spin" /> : 'Confirm & Proceed to Payment'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>
   );
 }
 
-
 export default function CartSidebar() {
   const { cart, removeFromCart, updateQuantity, cartCount, cartTotal, open, setOpen } = useAppContext();
   
   const handleCheckoutViaWhatsApp = () => {
     if (cart.length === 0) return;
-    let message = "Hi Eddjos, I would like to order:\n\n";
+    let message = "Hi Eddjos, I want to order:\n\n";
     cart.forEach(item => {
       message += `- ${item.name} (x${item.quantity})\n`;
     });
-    message += `\nTotal: Ksh ${cartTotal.toFixed(2)}`;
+    message += `\nTotal: Ksh ${cartTotal.toLocaleString()}`;
     const whatsappUrl = `https://wa.me/254740685488?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
 
   return (
-    <>
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-gray-200">
-              <ShoppingBag />
-              {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black text-white text-[10px] font-bold">
-                      {cartCount}
-                  </span>
-              )}
-          </Button>
-        </SheetTrigger>
-        <SheetContent className="w-full sm:max-w-md flex flex-col border-l-4 border-black">
-          <SheetHeader>
-            <SheetTitle className="text-2xl font-black italic underline underline-offset-8 decoration-4 decoration-yellow-400">BAG ({cartCount})</SheetTitle>
-          </SheetHeader>
-          {cart.length > 0 ? (
-            <>
-              <div className="flex-grow overflow-y-auto mt-6 space-y-4 pr-2">
-                {cart.map(item => (
-                  <div key={item.id} className="flex gap-4 p-3 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-black transition-all group">
-                    <div className="relative h-20 w-20 rounded-xl overflow-hidden border border-gray-200 flex-shrink-0">
-                      <Image
-                        src={item.images[0]?.url || ''}
-                        alt={item.name}
-                        fill
-                        className="object-cover"
-                      />
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-gray-100">
+            <ShoppingBag size={20} />
+            {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black text-white text-[10px] font-bold">
+                    {cartCount}
+                </span>
+            )}
+        </Button>
+      </SheetTrigger>
+      <SheetContent className="w-full sm:max-w-md flex flex-col p-0">
+        <SheetHeader className="p-6 border-b">
+          <SheetTitle className="text-xl font-black">YOUR BAG ({cartCount})</SheetTitle>
+        </SheetHeader>
+        {cart.length > 0 ? (
+          <>
+            <div className="flex-grow overflow-y-auto p-6 space-y-4">
+              {cart.map(item => (
+                <div key={item.id} className="flex gap-4 group">
+                  <div className="relative h-24 w-20 rounded-xl overflow-hidden border bg-gray-50 flex-shrink-0">
+                    <Image
+                      src={item.images[0]?.url || ''}
+                      alt={item.name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="flex-grow min-w-0 py-1">
+                    <h4 className="font-bold truncate text-sm text-gray-900">{item.name}</h4>
+                    <p className="font-black text-black text-sm mt-1">Ksh {item.price.toLocaleString()}</p>
+                    <div className="flex items-center gap-3 mt-3 bg-gray-50 w-fit px-2 py-1 rounded-full border">
+                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="hover:text-red-500 transition-colors"><Minus className="h-3 w-3" /></button>
+                        <span className="font-black text-xs min-w-[12px] text-center">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="hover:text-blue-500 transition-colors"><Plus className="h-3 w-3" /></button>
                     </div>
-                    <div className="flex-grow min-w-0">
-                      <h4 className="font-bold truncate text-sm">{item.name}</h4>
-                      <p className="font-black text-blue-600 text-sm">Ksh {item.price.toFixed(2)}</p>
-                      <div className="flex items-center gap-3 mt-2 bg-white w-fit px-2 py-1 rounded-full border shadow-sm">
-                          <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="hover:text-red-500"><Minus className="h-3 w-3" /></button>
-                          <span className="font-bold text-xs">{item.quantity}</span>
-                          <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="hover:text-green-500"><Plus className="h-3 w-3" /></button>
-                      </div>
-                    </div>
-                    <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-2"><X className="h-5 w-5" /></button>
                   </div>
-                ))}
-              </div>
-              <SheetFooter className="mt-auto pt-6 border-t-2 border-black space-y-4">
-                  <div className="flex justify-between items-end mb-2">
-                      <span className="text-sm font-bold text-gray-500 uppercase tracking-tighter">Subtotal</span>
-                      <span className="text-2xl font-black">Ksh {cartTotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <CheckoutDialog />
-                    <Button size="lg" variant="tactile-green" className="w-full h-12 rounded-full font-bold shadow-md" onClick={handleCheckoutViaWhatsApp}>
-                        <WhatsAppIcon />
-                        WhatsApp Order
-                    </Button>
-                  </div>
-              </SheetFooter>
-            </>
-          ) : (
-            <div className="flex-grow flex flex-col items-center justify-center text-center opacity-40">
-              <ShoppingBag className="h-16 w-16 mb-4" />
-              <p className="text-xl font-black">EMPTY BAG</p>
+                  <button onClick={() => removeFromCart(item.id)} className="text-gray-300 hover:text-red-500 transition-colors self-start py-1"><X className="h-4 w-4" /></button>
+                </div>
+              ))}
             </div>
-          )}
-        </SheetContent>
-      </Sheet>
-    </>
+            <SheetFooter className="p-6 border-t bg-gray-50 flex-col sm:flex-col sm:space-x-0 gap-3">
+                <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Bag Total</span>
+                    <span className="text-xl font-black">Ksh {cartTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <CheckoutDialog />
+                  <Button size="lg" variant="tactile-green" className="w-full h-12 rounded-full font-bold shadow-md" onClick={handleCheckoutViaWhatsApp}>
+                      <WhatsAppIcon />
+                      Order via WhatsApp
+                  </Button>
+                </div>
+            </SheetFooter>
+          </>
+        ) : (
+          <div className="flex-grow flex flex-col items-center justify-center text-center p-6 space-y-4">
+            <div className="h-20 w-20 bg-gray-50 rounded-full flex items-center justify-center">
+              <ShoppingBag className="h-8 w-8 text-gray-200" />
+            </div>
+            <div>
+              <p className="text-lg font-black text-gray-900">BAG IS EMPTY</p>
+              <p className="text-sm text-gray-400">Discover something you love.</p>
+            </div>
+            <Button variant="outline" className="rounded-full px-8" onClick={() => setOpen(false)}>Continue Browsing</Button>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }

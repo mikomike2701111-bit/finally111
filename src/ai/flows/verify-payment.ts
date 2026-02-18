@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview A server-side flow to securely verify Paystack payments.
+ * @fileOverview A server-side flow to securely verify Paystack payments and record orders.
  *
  * - verifyPayment - A function that verifies a payment reference with Paystack and records the order.
  * - VerifyPaymentInput - The input type for the verifyPayment function.
@@ -57,11 +57,12 @@ const verifyPaymentFlow = ai.defineFlow(
     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
     if (!PAYSTACK_SECRET_KEY) {
-      console.error('Paystack secret key is not configured.');
+      console.error('SERVER_ERROR: Paystack secret key is missing.');
       return { success: false, message: 'Server configuration error.' };
     }
 
     try {
+      console.log(`VERIFY_PAYMENT: Initiating check for reference: ${reference}`);
       const response = await axios.get(
         `https://api.paystack.co/transaction/verify/${reference}`,
         {
@@ -74,21 +75,20 @@ const verifyPaymentFlow = ai.defineFlow(
       const { status, data } = response;
 
       if (status === 200 && data?.data?.status === 'success') {
-        // Payment is successful.
-        const amountPaid = data.data.amount / 100; // Paystack amount is in kobo/cents
-        if (amountPaid < orderPayload.totalAmount) {
-          console.warn(
-            `Tampering detected. Paystack amount ${amountPaid} is less than order total ${orderPayload.totalAmount}`
-          );
+        const amountPaidKobo = data.data.amount;
+        const expectedAmountKobo = orderPayload.totalAmount * 100;
+
+        if (amountPaidKobo < expectedAmountKobo) {
+          console.error(`SECURITY_ALERT: Amount mismatch. Paid: ${amountPaidKobo}, Expected: ${expectedAmountKobo}`);
           return {
             success: false,
-            message: 'Payment amount does not match order total.',
+            message: 'Payment amount mismatch detected.',
           };
         }
         
-        const customerEmail = data.data.customer?.email;
+        const customerEmail = data.data.customer?.email || 'N/A';
 
-        // Amount is valid, create the order in Firestore.
+        // Record the order ONLY after successful payment verification
         const { products, totalAmount, shippingAddress, customerName, customerPhone } = orderPayload;
         const orderData: Omit<Order, 'id' | 'createdAt'> & {
           createdAt: FieldValue;
@@ -104,15 +104,15 @@ const verifyPaymentFlow = ai.defineFlow(
         };
 
         const orderRef = await adminDb.collection('orders').add(orderData);
-        console.log('Order created successfully with ID: ', orderRef.id);
+        console.log(`ORDER_SUCCESS: Created order ${orderRef.id} for ${customerName}`);
 
         return {
           success: true,
-          message: 'Payment verified and order created.',
+          message: 'Payment verified and order recorded.',
           orderId: orderRef.id,
         };
       } else {
-        // Payment was not successful according to Paystack.
+        console.warn(`PAYMENT_FAILED: Paystack status: ${data?.data?.status}`);
         return {
           success: false,
           message: data?.message || 'Payment verification failed.',
@@ -120,12 +120,12 @@ const verifyPaymentFlow = ai.defineFlow(
       }
     } catch (error: any) {
       console.error(
-        'Error verifying payment:',
+        'VERIFY_ERROR:',
         error.response?.data || error.message
       );
       return {
         success: false,
-        message: 'An error occurred during payment verification.',
+        message: 'Could not complete payment verification.',
       };
     }
   }
