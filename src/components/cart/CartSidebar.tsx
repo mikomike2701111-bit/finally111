@@ -43,7 +43,7 @@ function CheckoutDialog() {
 
   const checkoutForm = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutSchema),
-    defaultValues: { name: '', phone: '', description: '' },
+    defaultValues: { name: '', phone: '0700000000', description: '' },
     mode: 'onChange',
   });
 
@@ -53,22 +53,20 @@ function CheckoutDialog() {
 
   const config = React.useMemo(() => ({
     reference: (new Date()).getTime().toString(),
-    email: "customer@example.com",
+    email: "customer@runway.com", // Simplified email requirement
     amount: cartTotal * 100,
     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
     currency: 'KES',
-    phone: watchedPhone,
     metadata: {
         cartItems: cart.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })),
-        total: cartTotal,
         customerName: watchedName,
+        customerPhone: watchedPhone,
         custom_fields: [
           { display_name: "Cart Total", variable_name: "cart_total", value: `Ksh ${cartTotal.toFixed(2)}`},
-          { display_name: "Number of Items", variable_name: "number_of_items", value: cartCount },
-          { display_name: "Address Description", variable_name: watchedDescription }
+          { display_name: "Address", variable_name: "address", value: watchedDescription }
         ]
     }
-  }), [cart, cartTotal, cartCount, watchedPhone, watchedName, watchedDescription]);
+  }), [cart, cartTotal, watchedPhone, watchedName, watchedDescription]);
 
   const initializePayment = usePaystackPayment(config);
 
@@ -84,36 +82,33 @@ function CheckoutDialog() {
     try {
       const result = await verifyPayment({ reference: reference.reference, orderPayload });
       if (result.success) {
-        toast({ title: "Payment Successful!", description: "Thank you for your purchase. Your order has been placed." });
+        toast({ title: "Payment Successful!", description: "Order has been placed." });
         clearCart();
         setCartOpen(false);
+        setIsCheckoutDialogOpen(false);
       } else {
-        toast({ variant: "destructive", title: "Payment Verification Failed", description: result.message || "Please contact support." });
+        toast({ variant: "destructive", title: "Payment Verification Failed", description: result.message });
       }
     } catch (error) {
       console.error("Verification flow error:", error);
-      toast({ variant: "destructive", title: "Verification Error", description: "A server error occurred. Please contact support." });
+      toast({ variant: "destructive", title: "Verification Error", description: "A server error occurred." });
     } finally {
       setIsVerifying(false);
-      setIsCheckoutDialogOpen(false);
     }
   };
 
-  const onPaymentClose = () => {
-    setIsCheckoutDialogOpen(true); // Keep it open if user closes paystack popup
-  };
-
-  const handleCheckoutSubmit = () => {
-    initializePayment(onPaymentSuccess, onPaymentClose);
+  const handleCheckoutSubmit = (data: CheckoutFormData) => {
+    // IMPORTANT: Keep dialog open to prevent payment popup from being blocked/closed
+    initializePayment(onPaymentSuccess, () => {});
   };
   
   const handlePayNowClick = () => {
     if (cart.length === 0) {
-      toast({ variant: "destructive", title: "Cart is Empty", description: "Please add items to your cart." });
+      toast({ variant: "destructive", title: "Cart is Empty" });
       return;
     }
     if (!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) {
-      toast({ variant: "destructive", title: "Configuration Error", description: "Payment gateway is not configured." });
+      toast({ variant: "destructive", title: "Gateway Error", description: "Payment gateway key missing." });
       return;
     }
     setIsCheckoutDialogOpen(true);
@@ -121,39 +116,41 @@ function CheckoutDialog() {
 
   return (
     <>
-      <Button className="w-full" size="lg" onClick={handlePayNowClick} disabled={isVerifying}>
+      <Button className="w-full h-12 rounded-full font-bold shadow-lg" size="lg" onClick={handlePayNowClick} disabled={isVerifying}>
         {isVerifying ? 'Processing...' : 'Pay Now'}
       </Button>
-      <Dialog open={isCheckoutDialogOpen} onOpenChange={setIsCheckoutDialogOpen}>
-        <DialogContent>
+      <Dialog open={isCheckoutDialogOpen} onOpenChange={(open) => !isVerifying && setIsCheckoutDialogOpen(open)}>
+        <DialogContent onPointerDownOutside={(e) => isVerifying && e.preventDefault()} className="rounded-3xl">
           <DialogHeader>
-            <DialogTitle>Checkout Details</DialogTitle>
+            <DialogTitle className="text-2xl font-black">Delivery Details</DialogTitle>
           </DialogHeader>
           <Form {...checkoutForm}>
             <form onSubmit={checkoutForm.handleSubmit(handleCheckoutSubmit)} className="space-y-4 py-4">
                 <FormField control={checkoutForm.control} name="name" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl><Input placeholder="e.g., Jane Doe" {...field} /></FormControl>
+                    <FormLabel className="font-bold">Full Name</FormLabel>
+                    <FormControl><Input placeholder="Jane Doe" {...field} className="rounded-xl border-2" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}/>
                 <FormField control={checkoutForm.control} name="phone" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl><Input type="tel" placeholder="e.g., 0700000000" {...field} /></FormControl>
+                    <FormLabel className="font-bold">Phone Number</FormLabel>
+                    <FormControl><Input type="tel" {...field} className="rounded-xl border-2" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}/>
               <FormField control={checkoutForm.control} name="description" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address Description</FormLabel>
-                  <FormControl><Textarea placeholder="e.g., Building name, street, house number" {...field} /></FormControl>
+                  <FormLabel className="font-bold">Where should we deliver?</FormLabel>
+                  <FormControl><Textarea placeholder="Building, Street, House No." {...field} className="rounded-xl border-2" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}/>
-              <DialogFooter>
-                <Button type="submit" disabled={!checkoutForm.formState.isValid}>Proceed to Payment</Button>
+              <DialogFooter className="mt-4">
+                <Button type="submit" size="lg" className="w-full rounded-2xl h-14 text-lg font-bold shadow-xl" disabled={!checkoutForm.formState.isValid || isVerifying}>
+                    {isVerifying ? <LoaderCircle className="animate-spin" /> : 'Confirm & Proceed to Pay'}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
@@ -165,20 +162,16 @@ function CheckoutDialog() {
 
 
 export default function CartSidebar() {
-  const { cart, removeFromCart, updateQuantity, cartCount, cartTotal, clearCart, open, setOpen } = useAppContext();
-  const [isVerifying, setIsVerifying] = React.useState(false);
+  const { cart, removeFromCart, updateQuantity, cartCount, cartTotal, open, setOpen } = useAppContext();
   
   const handleCheckoutViaWhatsApp = () => {
     if (cart.length === 0) return;
-
-    let message = "Hi Eddjos, I would like to order the following items:\n\n";
+    let message = "Hi Eddjos, I would like to order:\n\n";
     cart.forEach(item => {
-      message += `- ${item.name} (Quantity: ${item.quantity})\n`;
+      message += `- ${item.name} (x${item.quantity})\n`;
     });
-    message += `\nTotal Price: Ksh ${cartTotal.toFixed(2)}`;
-
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/254740685488?text=${encodedMessage}`;
+    message += `\nTotal: Ksh ${cartTotal.toFixed(2)}`;
+    const whatsappUrl = `https://wa.me/254740685488?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
 
@@ -186,80 +179,63 @@ export default function CartSidebar() {
     <>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative">
+          <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-gray-200">
               <ShoppingBag />
               {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black text-white text-[10px] font-bold">
                       {cartCount}
                   </span>
               )}
-              <span className="sr-only">Open shopping cart</span>
           </Button>
         </SheetTrigger>
-        <SheetContent className="w-full sm:max-w-md flex flex-col">
-          {isVerifying && (
-            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center gap-4">
-              <LoaderCircle className="w-10 h-10 animate-spin text-primary" />
-              <p className="text-lg font-semibold">Verifying your payment...</p>
-              <p className="text-sm text-muted-foreground">Please do not close this window.</p>
-            </div>
-          )}
+        <SheetContent className="w-full sm:max-w-md flex flex-col border-l-4 border-black">
           <SheetHeader>
-            <SheetTitle>Shopping Cart ({cartCount})</SheetTitle>
+            <SheetTitle className="text-2xl font-black italic underline underline-offset-8 decoration-4 decoration-yellow-400">BAG ({cartCount})</SheetTitle>
           </SheetHeader>
           {cart.length > 0 ? (
             <>
-              <div className="flex-grow overflow-y-auto -mx-6 px-6 divide-y">
+              <div className="flex-grow overflow-y-auto mt-6 space-y-4 pr-2">
                 {cart.map(item => (
-                  <div key={item.id} className="flex items-center gap-4 py-4">
-                    <div className="relative h-20 w-20 rounded-md overflow-hidden">
+                  <div key={item.id} className="flex gap-4 p-3 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-black transition-all group">
+                    <div className="relative h-20 w-20 rounded-xl overflow-hidden border border-gray-200 flex-shrink-0">
                       <Image
                         src={item.images[0]?.url || ''}
-                        alt={item.images[0]?.alt || item.name}
+                        alt={item.name}
                         fill
                         className="object-cover"
-                        sizes="80px"
                       />
                     </div>
-                    <div className="flex-grow">
-                      <Link href={`/products/${item.slug}`} className="font-semibold hover:underline" onClick={() => setOpen(false)}>{item.name}</Link>
-                      <p className="text-sm text-muted-foreground">Ksh {item.price.toFixed(2)}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
-                              <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="font-semibold">{item.quantity}</span>
-                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(item.id, item.quantity + 1)}>
-                              <Plus className="h-4 w-4" />
-                          </Button>
+                    <div className="flex-grow min-w-0">
+                      <h4 className="font-bold truncate text-sm">{item.name}</h4>
+                      <p className="font-black text-blue-600 text-sm">Ksh {item.price.toFixed(2)}</p>
+                      <div className="flex items-center gap-3 mt-2 bg-white w-fit px-2 py-1 rounded-full border shadow-sm">
+                          <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="hover:text-red-500"><Minus className="h-3 w-3" /></button>
+                          <span className="font-bold text-xs">{item.quantity}</span>
+                          <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="hover:text-green-500"><Plus className="h-3 w-3" /></button>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => removeFromCart(item.id)}>
-                      <X className="h-5 w-5" />
-                    </Button>
+                    <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-2"><X className="h-5 w-5" /></button>
                   </div>
                 ))}
               </div>
-              <SheetFooter className="mt-auto border-t pt-4 space-y-4">
-                  <div className="flex justify-between font-semibold">
-                      <span>Total</span>
-                      <span>Ksh {cartTotal.toFixed(2)}</span>
+              <SheetFooter className="mt-auto pt-6 border-t-2 border-black space-y-4">
+                  <div className="flex justify-between items-end mb-2">
+                      <span className="text-sm font-bold text-gray-500 uppercase tracking-tighter">Subtotal</span>
+                      <span className="text-2xl font-black">Ksh {cartTotal.toFixed(2)}</span>
                   </div>
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     <CheckoutDialog />
-                    <Button size="lg" variant="tactile-green" className="w-full" onClick={handleCheckoutViaWhatsApp} disabled={isVerifying}>
+                    <Button size="lg" variant="tactile-green" className="w-full h-12 rounded-full font-bold shadow-md" onClick={handleCheckoutViaWhatsApp}>
                         <WhatsAppIcon />
-                        Checkout via WhatsApp
+                        WhatsApp Order
                     </Button>
                   </div>
-                  <Button variant="outline" className="w-full" onClick={clearCart} disabled={isVerifying}>Clear Cart</Button>
               </SheetFooter>
             </>
           ) : (
-            <div className="flex-grow flex flex-col items-center justify-center text-center">
-              <ShoppingBag className="h-16 w-16 text-muted-foreground" />
-              <p className="mt-4 font-semibold">Your cart is empty</p>
-              <p className="text-sm text-muted-foreground">Add some products to get started.</p>
+            <div className="flex-grow flex flex-col items-center justify-center text-center opacity-40">
+              <ShoppingBag className="h-16 w-16 mb-4" />
+              <p className="text-xl font-black">EMPTY BAG</p>
             </div>
           )}
         </SheetContent>

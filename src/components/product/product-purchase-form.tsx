@@ -37,12 +37,11 @@ const WhatsAppIcon = () => (
 const addressSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   phone: z.string().min(10, 'A valid phone number is required'),
-  description: z.string().min(1, 'Address description is required'),
+  description: z.string().min(1, 'Address is required'),
 });
 type AddressFormData = z.infer<typeof addressSchema>;
 
 const fallbackColors = ['#111827', '#f9fafb', '#4b5563', '#9ca3af'];
-const sizes = ['S', 'M', 'L', 'XL'];
 
 export default function ProductPurchaseForm({ product, selectedColor, setSelectedColor }: ProductPurchaseFormProps) {
   const { addToCart, toggleWishlist, isProductInWishlist } = useAppContext();
@@ -56,7 +55,7 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   
   const addressForm = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
-    defaultValues: { name: '', phone: '', description: '' },
+    defaultValues: { name: '', phone: '0700000000', description: '' },
     mode: 'onChange',
   });
 
@@ -66,57 +65,26 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
   
   const config = useMemo(() => ({
     reference: (new Date()).getTime().toString(),
-    email: "customer@example.com",
+    email: "customer@runway.com",
     amount: product.price * quantity * 100,
     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
     currency: 'KES',
-    phone: watchedPhone,
     metadata: {
       productName: product.name,
       quantity,
       size: selectedSize,
       customerName: watchedName,
+      customerPhone: watchedPhone,
       custom_fields: [
-        { display_name: "Product Name", variable_name: "product_name", value: product.name },
+        { display_name: "Product", variable_name: "product", value: product.name },
         { display_name: "Quantity", variable_name: "quantity", value: quantity },
         { display_name: "Size", variable_name: "size", value: selectedSize },
-        { display_name: "Address Description", variable_name: "shipping_description", value: watchedDescription }
+        { display_name: "Address", variable_name: "address", value: watchedDescription }
       ]
     }
   }), [product, quantity, selectedSize, watchedPhone, watchedName, watchedDescription]);
 
   const initializePayment = usePaystackPayment(config);
-
-  const availableSizes = product.sizes || ['S', 'M', 'L'];
-
-  const handleAddToCart = () => {
-    addToCart(product, quantity);
-  };
-
-  const handleToggleWishlist = () => {
-    toggleWishlist(product.id);
-  };
-  
-  const handleBuyViaWhatsApp = () => {
-    const selectedColorName = product.availableColors?.find(c => c.hex === selectedColor)?.name;
-    const colorText = selectedColorName ? ` in color ${selectedColorName}` : '';
-    const message = `Hi Eddjos, I would like to order ${quantity} of the ${product.name}${colorText} in Size ${selectedSize}. Price: Ksh ${(product.price * quantity).toFixed(2)}.`;
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/254740685488?text=${encodedMessage}`;
-    window.open(whatsappUrl, '_blank');
-  };
-  
-  const handlePayNowClick = () => {
-      if (!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) {
-          toast({
-              variant: "destructive",
-              title: "Configuration Error",
-              description: "Payment gateway is not configured correctly."
-          });
-          return;
-      }
-      setIsAddressDialogOpen(true);
-  };
 
   const onPaymentSuccess = async (reference: any) => {
     setIsVerifying(true);
@@ -130,175 +98,142 @@ export default function ProductPurchaseForm({ product, selectedColor, setSelecte
     try {
       const result = await verifyPayment({ reference: reference.reference, orderPayload });
       if (result.success) {
-        toast({ title: "Payment Successful!", description: "Thank you for your purchase. Your order has been placed." });
+        toast({ title: "Order Placed!", description: "Payment verified successfully." });
+        setIsAddressDialogOpen(false);
       } else {
-        toast({ variant: "destructive", title: "Payment Verification Failed", description: result.message || "Please contact support." });
+        toast({ variant: "destructive", title: "Error", description: result.message });
       }
     } catch (error) {
-      console.error("Verification flow error:", error);
-      toast({ variant: "destructive", title: "Verification Error", description: "A server error occurred. Please contact support." });
+      console.error("Verification error:", error);
+      toast({ variant: "destructive", title: "System Error" });
     } finally {
       setIsVerifying(false);
-      setIsAddressDialogOpen(false);
     }
   };
 
-  const onPaymentClose = () => {
-    setIsAddressDialogOpen(true); // Keep dialog open if user closes paystack
-  };
-  
-  const handleAddressSubmit = () => {
-    initializePayment(onPaymentSuccess, onPaymentClose);
+  const handleAddressSubmit = (data: AddressFormData) => {
+    // Keep dialog open during Paystack session
+    initializePayment(onPaymentSuccess, () => {});
   };
 
   const colorOptions = product.availableColors || fallbackColors.map(hex => ({ name: hex, hex }));
+  const availableSizes = product.sizes || ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
   return (
     <>
-    <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-sm space-y-6">
+    <div className="bg-white p-4 sm:p-8 rounded-3xl shadow-xl border-2 border-black space-y-8 relative overflow-hidden">
       {isVerifying && (
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center gap-4 rounded-2xl">
-          <LoaderCircle className="w-10 h-10 animate-spin text-primary" />
-          <p className="text-lg font-semibold">Verifying your payment...</p>
-        </div>
-      )}
-      <div>
-        <div className="flex justify-between items-start gap-4">
-          <h1 className="text-3xl font-bold">{product.name}</h1>
-          <button
-            onClick={handleToggleWishlist}
-            className={cn(
-                "wishlist-btn",
-                isInWishlist && "active"
-            )}
-            aria-label="Add to wishlist"
-            >
-            <div className="particles">
-                <span style={{'--i': 1} as React.CSSProperties}></span>
-                <span style={{'--i': 2} as React.CSSProperties}></span>
-                <span style={{'--i': 3} as React.CSSProperties}></span>
-                <span style={{'--i': 4} as React.CSSProperties}></span>
-                <span style={{'--i': 5} as React.CSSProperties}></span>
-                <span style={{'--i': 6} as React.CSSProperties}></span>
-            </div>
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-                stroke="black" strokeWidth="1.5"/>
-            </svg>
-        </button>
-        </div>
-      </div>
-
-      {colorOptions.length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium text-gray-900">Color</h3>
-          <div className="flex items-center gap-3 mt-2">
-            {colorOptions.map((color) => (
-              <button
-                key={color.name}
-                onClick={() => setSelectedColor(color.hex)}
-                className={`w-8 h-8 rounded-full border-2 transition-all ${selectedColor === color.hex ? 'border-primary ring-2 ring-primary ring-offset-2' : 'border-gray-200'}`}
-                style={{ backgroundColor: color.hex }}
-              >
-                <span className="sr-only">{color.name}</span>
-              </button>
-            ))}
-          </div>
+        <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
+          <LoaderCircle className="w-12 h-12 animate-spin text-black" />
+          <p className="font-black text-lg">VERIFYING PAYMENT...</p>
         </div>
       )}
       
-      <div className="flex justify-between items-end">
-        <div>
-          <h3 className="text-sm font-medium text-gray-900">Size</h3>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            {sizes.map((size) => {
-              const isAvailable = availableSizes.includes(size);
-              return (
-                <Button
-                  key={size}
-                  variant={selectedSize === size ? 'default' : 'outline'}
-                  disabled={!isAvailable}
-                  onClick={() => setSelectedSize(size)}
-                  className={`rounded-full px-4 py-2 ${!isAvailable ? 'text-gray-400 line-through' : ''}`}
-                >
+      <div className="flex justify-between items-start gap-4">
+        <div className="space-y-1">
+            <h1 className="text-4xl font-black italic tracking-tighter uppercase">{product.name}</h1>
+            <div className="flex items-center gap-2">
+                <span className="text-xs font-bold bg-black text-white px-2 py-0.5 rounded-full uppercase">{product.category}</span>
+                {product.style && <span className="text-xs font-bold bg-yellow-400 px-2 py-0.5 rounded-full uppercase">{product.style}</span>}
+            </div>
+        </div>
+        <button onClick={() => toggleWishlist(product.id)} className={cn("wishlist-btn", isInWishlist && "active")} aria-label="Wishlist">
+            <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="black" strokeWidth="2"/></svg>
+        </button>
+      </div>
+
+      <div className="space-y-4">
+          {colorOptions.length > 0 && (
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 mb-2">Select Color</h3>
+              <div className="flex items-center gap-3">
+                {colorOptions.map((color) => (
+                  <button key={color.name} onClick={() => setSelectedColor(color.hex)} className={cn("w-10 h-10 rounded-full border-4 transition-all", selectedColor === color.hex ? 'border-black scale-110 shadow-lg' : 'border-gray-100 hover:scale-105')} style={{ backgroundColor: color.hex }} />
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 mb-2">Select Size</h3>
+            <div className="flex flex-wrap gap-2">
+              {availableSizes.map((size) => (
+                <Button key={size} variant={selectedSize === size ? 'default' : 'outline'} onClick={() => setSelectedSize(size)} className={cn("rounded-xl font-bold min-w-[50px] border-2 h-10 transition-all", selectedSize === size ? 'border-black' : 'border-gray-200 hover:border-gray-400')}>
                   {size}
                 </Button>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
-        <a href="#" className="text-sm text-primary hover:underline">Size Guide</a>
-      </div>
 
-      <div>
-        <h3 className="text-sm font-medium text-gray-900">Quantity</h3>
-        <div className="flex items-center gap-4 mt-2">
-          <div className="flex items-center border rounded-full">
-            <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setQuantity(q => Math.max(1, q - 1))}>
-              <Minus className="w-4 h-4" />
-            </Button>
-            <span className="w-10 text-center font-semibold">{quantity}</span>
-            <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setQuantity(q => q + 1)}>
-              <Plus className="w-4 h-4" />
-            </Button>
+          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border-2 border-transparent hover:border-black transition-all">
+            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500">Quantity</h3>
+            <div className="flex items-center gap-4 bg-white rounded-full border-2 px-1 py-1 shadow-sm">
+                <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={() => setQuantity(q => Math.max(1, q - 1))}><Minus className="w-3 h-3" /></Button>
+                <span className="w-6 text-center font-black">{quantity}</span>
+                <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={() => setQuantity(q => q + 1)}><Plus className="w-3 h-3" /></Button>
+            </div>
           </div>
-        </div>
       </div>
       
-      <div className="border-t pt-6 space-y-4">
-        <div className="flex justify-between items-center">
-            <span className="text-lg text-gray-500">Total Price</span>
-            <p className="text-3xl font-bold">Ksh {(product.price * quantity).toFixed(2)}</p>
+      <div className="space-y-4 pt-4 border-t-4 border-black border-dotted">
+        <div className="flex justify-between items-end">
+            <span className="text-sm font-bold text-gray-400 uppercase tracking-tighter">Total Price</span>
+            <p className="text-4xl font-black italic">Ksh {(product.price * quantity).toLocaleString()}</p>
         </div>
-        <div className="grid grid-cols-1 gap-2">
-            <Button size="lg" className="w-full rounded-full h-12 text-base font-bold" onClick={handleAddToCart} disabled={isVerifying}>Add to Cart</Button>
-            <Button size="lg" variant="default" className="w-full rounded-full h-12 text-base font-bold" onClick={handlePayNowClick} disabled={isVerifying}>
-                {isVerifying ? 'Processing...' : 'Pay Now'}
+        
+        <div className="flex flex-col gap-3">
+            <Button size="lg" className="w-full rounded-2xl h-14 text-lg font-black shadow-xl" onClick={() => addToCart(product, quantity)}>ADD TO BAG</Button>
+            <Button size="lg" variant="secondary" className="w-full rounded-2xl h-14 text-lg font-black shadow-xl border-2 border-black" onClick={() => setIsAddressDialogOpen(true)}>
+                BUY NOW
             </Button>
-            <Button size="lg" variant="tactile-green" className="w-full rounded-full h-12 text-base font-bold" onClick={handleBuyViaWhatsApp} disabled={isVerifying}>
+            <Button size="lg" variant="tactile-green" className="w-full rounded-2xl h-14 text-lg font-black shadow-xl" onClick={() => {
+                const message = `Hi Eddjos, I want to buy ${quantity}x ${product.name} in Size ${selectedSize}. Total: Ksh ${(product.price * quantity).toLocaleString()}.`;
+                window.open(`https://wa.me/254740685488?text=${encodeURIComponent(message)}`, '_blank');
+            }}>
                 <WhatsAppIcon />
-                Buy via WhatsApp
+                ORDER ON WHATSAPP
             </Button>
         </div>
       </div>
 
-      <div>
-        <h3 className="text-base font-semibold text-gray-900">Description</h3>
-        <p className="mt-2 text-gray-600 text-sm leading-relaxed">
-          {product.description}
-        </p>
+      <div className="bg-gray-50 p-6 rounded-3xl">
+        <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Product Details</h3>
+        <p className="text-sm font-medium leading-relaxed text-gray-700">{product.description}</p>
       </div>
     </div>
-    <Dialog open={isAddressDialogOpen} onOpenChange={setIsAddressDialogOpen}>
-        <DialogContent>
+
+    <Dialog open={isAddressDialogOpen} onOpenChange={(open) => !isVerifying && setIsAddressDialogOpen(open)}>
+        <DialogContent onPointerDownOutside={(e) => isVerifying && e.preventDefault()} className="rounded-3xl border-4 border-black">
           <DialogHeader>
-            <DialogTitle>Shipping & Contact Details</DialogTitle>
+            <DialogTitle className="text-3xl font-black italic uppercase">Checkout</DialogTitle>
           </DialogHeader>
           <Form {...addressForm}>
             <form onSubmit={addressForm.handleSubmit(handleAddressSubmit)} className="space-y-4 py-4">
-               <FormField control={addressForm.control} name="name" render={({ field }) => (
+                <FormField control={addressForm.control} name="name" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl><Input placeholder="e.g., Jane Doe" {...field} /></FormControl>
+                    <FormLabel className="font-black text-xs uppercase ml-1">Full Name</FormLabel>
+                    <FormControl><Input placeholder="John Doe" {...field} className="rounded-xl border-2 h-12" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}/>
                 <FormField control={addressForm.control} name="phone" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl><Input type="tel" placeholder="e.g., 0700000000" {...field} /></FormControl>
+                    <FormLabel className="font-black text-xs uppercase ml-1">Phone Number</FormLabel>
+                    <FormControl><Input type="tel" {...field} className="rounded-xl border-2 h-12" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}/>
               <FormField control={addressForm.control} name="description" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address Description</FormLabel>
-                  <FormControl><Textarea placeholder="e.g., Building name, street, house number" {...field} /></FormControl>
+                  <FormLabel className="font-black text-xs uppercase ml-1">Delivery Address</FormLabel>
+                  <FormControl><Textarea placeholder="Building, Estate, Apartment No." {...field} className="rounded-xl border-2 min-h-[100px]" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}/>
-              <DialogFooter>
-                <Button type="submit" disabled={!addressForm.formState.isValid}>Proceed to Payment</Button>
+              <DialogFooter className="mt-6">
+                <Button type="submit" size="lg" className="w-full rounded-2xl h-14 text-lg font-black shadow-xl" disabled={!addressForm.formState.isValid || isVerifying}>
+                    {isVerifying ? <LoaderCircle className="animate-spin" /> : 'CONFIRM & PAY'}
+                </Button>
               </DialogFooter>
             </form>
           </Form>

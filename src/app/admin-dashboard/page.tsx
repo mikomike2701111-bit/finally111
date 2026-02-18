@@ -13,9 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Trash, Edit, Copy, Star, PlusCircle, LogOut, AlertCircle } from 'lucide-react';
+import { Trash, Edit, Copy, Star, PlusCircle, LogOut, AlertCircle, ShoppingBag, Package, CheckCircle2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
@@ -26,27 +26,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
-const PRESET_COLORS = [
-    { name: 'Black', hex: '#111827' }, { name: 'White', hex: '#FFFFFF' },
-    { name: 'Stone', hex: '#A8A29E' }, { name: 'Gray', hex: '#6B7280' },
-    { name: 'Red', hex: '#EF4444' }, { name: 'Pink', hex: '#EC4899' },
-    { name: 'Blue', hex: '#3B82F6' }, { name: 'Sky', hex: '#0EA5E9' },
-    { name: 'Green', hex: '#22C55E' }, { name: 'Lime', hex: '#84CC16' },
-    { name: 'Yellow', hex: '#EAB308' }, { name: 'Orange', hex: '#F97316' },
-    { name: 'Brown', hex: '#78350F' }, { name: 'Beige', hex: '#F5F5DC' },
-    { name: 'Purple', hex: '#8B5CF6' }, { name: 'Indigo', hex: '#6366F1' },
-    { name: 'Sage', hex: '#8F9779' }, { name: 'Olive', hex: '#556B2F' },
-    { name: 'Terracotta', hex: '#E2725B' }, { name: 'Ochre', hex: '#CC7722' },
-    { name: 'Sand', hex: '#C2B280' }, { name: 'Taupe', hex: '#483C32' },
-    { name: 'Charcoal', hex: '#36454F' }, { name: 'Slate', hex: '#708090' },
-    { name: 'Navy', hex: '#000080' }, { name: 'Maroon', hex: '#800000' },
-    { name: 'Forest', hex: '#228B22' }, { name: 'Zinc', hex: '#B4B4B4' },
-    { name: 'Teal', hex: '#008080' }, { name: 'Emerald', hex: '#50C878' },
-    { name: 'Crimson', hex: '#DC143C' }, { name: 'Amber', hex: '#FFBF00' },
-    { name: 'Violet', hex: '#8F00FF' }, { name: 'Fuchsia', hex: '#FF00FF' },
-    { name: 'Mint', hex: '#98FF98' }, { name: 'Mauve', hex: '#E0B0FF' },
-];
 
 const AVAILABLE_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
@@ -99,15 +78,14 @@ function DashboardContent() {
   const { data: styles, isLoading: isLoadingStyles } = useCollection<Style>(stylesQuery);
   const { data: orders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
 
-  const salesCount = useMemo(() => {
-    if (!orders) return {};
-    const counts: { [key: string]: number } = {};
-    orders.forEach(order => {
-        order.products.forEach(product => {
-            counts[product.id] = (counts[product.id] || 0) + product.quantity;
-        });
-    });
-    return counts;
+  const stats = useMemo(() => {
+    if (!orders) return { totalSales: 0, pendingOrders: 0, totalRevenue: 0 };
+    return orders.reduce((acc, order) => {
+      acc.totalSales += order.products.reduce((sum, p) => sum + p.quantity, 0);
+      acc.totalRevenue += order.totalAmount;
+      if (order.status === 'pending') acc.pendingOrders++;
+      return acc;
+    }, { totalSales: 0, pendingOrders: 0, totalRevenue: 0 });
   }, [orders]);
 
   const sortedCategories = useMemo(() => categories?.sort((a, b) => a.name.localeCompare(b.name)) || [], [categories]);
@@ -226,7 +204,12 @@ function DashboardContent() {
   
   const openNewDialog = () => {
     setEditingProduct(null);
-    form.reset();
+    form.reset({
+      name: '', slug: '', description: '', category: '', style: '',
+      price: 0, originalPrice: null, imageUrl1: '', imageUrl2: '',
+      imageUrl3: '', imageUrl4: '', sizes: [], availableColors: [],
+      isFeatured: false,
+    });
     setIsDialogOpen(true);
   }
   
@@ -235,6 +218,7 @@ function DashboardContent() {
     addDocumentNonBlocking(collection(firestore, 'categories'), { name: newCategoryName.trim() });
     setNewCategoryName('');
     setIsCategoryDialogOpen(false);
+    toast({ title: 'Category Added' });
   };
   
   const handleAddStyle = () => {
@@ -242,6 +226,7 @@ function DashboardContent() {
     addDocumentNonBlocking(collection(firestore, 'styles'), { name: newStyleName.trim() });
     setNewStyleName('');
     setIsStyleDialogOpen(false);
+    toast({ title: 'Style Added' });
   };
   
   const handleUpdateOrderStatus = (orderId: string, status: Order['status']) => {
@@ -249,7 +234,7 @@ function DashboardContent() {
     updateDocumentNonBlocking(doc(firestore, 'orders', orderId), { status });
     toast({
       title: 'Order Status Updated',
-      description: `Order ${orderId.substring(0,6)}... has been set to ${status}.`
+      description: `Order has been set to ${status}.`
     })
   };
 
@@ -263,65 +248,103 @@ function DashboardContent() {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <div className="flex gap-4">
-            <Button variant="outline" onClick={handleLogout}><LogOut className="h-4 w-4 mr-2" /> Logout</Button>
-            <Button onClick={openNewDialog}>Add New Product</Button>
+    <div className="container mx-auto py-8 px-4 max-w-7xl">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+            <h1 className="text-4xl font-black tracking-tight">Admin Console</h1>
+            <p className="text-muted-foreground mt-1 text-sm uppercase font-semibold tracking-widest">Store Management</p>
+        </div>
+        <div className="flex gap-3">
+            <Button variant="outline" onClick={handleLogout} className="rounded-full"><LogOut className="h-4 w-4 mr-2" /> Logout</Button>
+            <Button onClick={openNewDialog} className="rounded-full shadow-lg"><PlusCircle className="h-4 w-4 mr-2" /> Add Product</Button>
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <Card className="border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+              <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                      <div className="p-3 bg-blue-100 rounded-2xl"><ShoppingBag className="text-blue-600" /></div>
+                      <div>
+                          <p className="text-sm font-bold text-muted-foreground uppercase">Revenue</p>
+                          <h3 className="text-2xl font-black">Ksh {stats.totalRevenue.toLocaleString()}</h3>
+                      </div>
+                  </div>
+              </CardContent>
+          </Card>
+          <Card className="border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+              <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                      <div className="p-3 bg-orange-100 rounded-2xl"><Package className="text-orange-600" /></div>
+                      <div>
+                          <p className="text-sm font-bold text-muted-foreground uppercase">Pending</p>
+                          <h3 className="text-2xl font-black">{stats.pendingOrders} Orders</h3>
+                      </div>
+                  </div>
+              </CardContent>
+          </Card>
+          <Card className="border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+              <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                      <div className="p-3 bg-green-100 rounded-2xl"><CheckCircle2 className="text-green-600" /></div>
+                      <div>
+                          <p className="text-sm font-bold text-muted-foreground uppercase">Total Sold</p>
+                          <h3 className="text-2xl font-black">{stats.totalSales} Items</h3>
+                      </div>
+                  </div>
+              </CardContent>
+          </Card>
+      </div>
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editingProduct ? 'Edit Product' : 'New Product'}</DialogTitle></DialogHeader>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader><DialogTitle className="text-2xl font-black">{editingProduct ? 'Edit Product' : 'New Product'}</DialogTitle></DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
               
-              <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem><FormLabel>Product Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )}/>
-              
-              <FormField control={form.control} name="slug" render={({ field }) => (
-                <FormItem><FormLabel>URL Slug</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-              )}/>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="name" render={({ field }) => (
+                    <FormItem><FormLabel className="font-bold">Product Name</FormLabel><FormControl><Input {...field} className="rounded-xl" /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                  <FormField control={form.control} name="slug" render={({ field }) => (
+                    <FormItem><FormLabel className="font-bold">URL Slug</FormLabel><FormControl><Input {...field} value={field.value || ''} className="rounded-xl" /></FormControl><FormMessage /></FormItem>
+                  )}/>
+              </div>
 
               <FormField control={form.control} name="isFeatured" render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5"><FormLabel className="text-base">Feature on Homepage</FormLabel></div>
+                  <FormItem className="flex flex-row items-center justify-between rounded-2xl border-2 border-black p-4 bg-gray-50">
+                    <div className="space-y-0.5"><FormLabel className="text-base font-bold">Feature on Homepage</FormLabel></div>
                     <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                   </FormItem>
               )}/>
 
-              <Separator />
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField control={form.control} name="category" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Category</FormLabel>
+                      <FormLabel className="font-bold">Category</FormLabel>
                        <div className="flex gap-2">
                         <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger className="rounded-xl"><SelectValue placeholder="Category" /></SelectTrigger></FormControl>
                           <SelectContent>
                             {sortedCategories.map(cat => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                        <Button type="button" variant="outline" size="icon" onClick={() => setIsCategoryDialogOpen(true)}><PlusCircle className="h-4 w-4" /></Button>
+                        <Button type="button" variant="outline" size="icon" className="rounded-xl" onClick={() => setIsCategoryDialogOpen(true)}><PlusCircle className="h-4 w-4" /></Button>
                       </div>
                       <FormMessage />
                     </FormItem>
                   )}/>
                   <FormField control={form.control} name="style" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Style</FormLabel>
+                      <FormLabel className="font-bold">Style</FormLabel>
                       <div className="flex gap-2">
                         <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Style" /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger className="rounded-xl"><SelectValue placeholder="Style" /></SelectTrigger></FormControl>
                           <SelectContent>
                             {sortedStyles.map(sty => <SelectItem key={sty.id} value={sty.name}>{sty.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                        <Button type="button" variant="outline" size="icon" onClick={() => setIsStyleDialogOpen(true)}><PlusCircle className="h-4 w-4" /></Button>
+                        <Button type="button" variant="outline" size="icon" className="rounded-xl" onClick={() => setIsStyleDialogOpen(true)}><PlusCircle className="h-4 w-4" /></Button>
                       </div>
                       <FormMessage />
                     </FormItem>
@@ -331,15 +354,15 @@ function DashboardContent() {
               <div className="grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="price" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Price</FormLabel>
-                        <FormControl><Input type="number" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} /></FormControl>
+                        <FormLabel className="font-bold">Price (Ksh)</FormLabel>
+                        <FormControl><Input type="number" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value)} className="rounded-xl" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}/>
                     <FormField control={form.control} name="originalPrice" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Original Price</FormLabel>
-                        <FormControl><Input type="number" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : e.target.value)} /></FormControl>
+                        <FormLabel className="font-bold">Original Price (Discount)</FormLabel>
+                        <FormControl><Input type="number" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : e.target.value)} className="rounded-xl" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}/>
@@ -348,30 +371,30 @@ function DashboardContent() {
                <Separator />
               
                <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Images</h3>
-                <div className="p-4 border rounded-lg space-y-4">
-                    <Input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+                <h3 className="text-lg font-black uppercase tracking-wider">Images</h3>
+                <div className="p-4 border-2 border-dashed border-gray-300 rounded-2xl space-y-4">
+                    <Input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploading} className="rounded-xl" />
                     {uploading && <Progress value={uploadProgress} className="h-2" />}
                     {uploadedUrl && (
-                        <div className="flex items-center gap-2"><Input readOnly value={uploadedUrl} className="text-xs" /><Button type="button" variant="outline" size="icon" onClick={copyUrlToClipboard}><Copy className="h-4 w-4" /></Button></div>
+                        <div className="flex items-center gap-2"><Input readOnly value={uploadedUrl} className="text-xs rounded-xl" /><Button type="button" variant="outline" size="icon" className="rounded-xl" onClick={copyUrlToClipboard}><Copy className="h-4 w-4" /></Button></div>
                     )}
                 </div>
                 <div className="grid grid-cols-1 gap-2">
-                    <FormField control={form.control} name="imageUrl1" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 1 URL (Main)" /></FormControl></FormItem> )}/>
-                    <FormField control={form.control} name="imageUrl2" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 2 URL" /></FormControl></FormItem> )}/>
-                    <FormField control={form.control} name="imageUrl3" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 3 URL" /></FormControl></FormItem> )}/>
-                    <FormField control={form.control} name="imageUrl4" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 4 URL" /></FormControl></FormItem> )}/>
+                    <FormField control={form.control} name="imageUrl1" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 1 URL (Main)" className="rounded-xl" /></FormControl></FormItem> )}/>
+                    <FormField control={form.control} name="imageUrl2" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 2 URL" className="rounded-xl" /></FormControl></FormItem> )}/>
+                    <FormField control={form.control} name="imageUrl3" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 3 URL" className="rounded-xl" /></FormControl></FormItem> )}/>
+                    <FormField control={form.control} name="imageUrl4" render={({ field }) => ( <FormItem><FormControl><Input {...field} value={field.value || ''} placeholder="Image 4 URL" className="rounded-xl" /></FormControl></FormItem> )}/>
                 </div>
               </div>
 
               <Separator />
 
-              <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} rows={4} /></FormControl><FormMessage /></FormItem>)}/>
+              <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel className="font-bold">Description</FormLabel><FormControl><Textarea {...field} rows={4} className="rounded-xl" /></FormControl><FormMessage /></FormItem>)}/>
               
               <FormField control={form.control} name="sizes" render={() => (
                 <FormItem>
-                    <FormLabel>Sizes</FormLabel>
-                    <div className="flex flex-wrap gap-4">
+                    <FormLabel className="font-bold">Available Sizes</FormLabel>
+                    <div className="flex flex-wrap gap-4 p-4 border rounded-2xl">
                     {AVAILABLE_SIZES.map((size) => (
                         <FormField key={size} control={form.control} name="sizes" render={({ field }) => (
                         <FormItem key={size} className="flex flex-row items-center space-x-2 space-y-0">
@@ -384,7 +407,7 @@ function DashboardContent() {
                 </FormItem>
               )}/>
 
-              <Button type="submit" size="lg" className="w-full">{editingProduct ? 'Update Product' : 'Add Product'}</Button>
+              <Button type="submit" size="lg" className="w-full rounded-2xl h-14 text-lg font-bold shadow-xl">{editingProduct ? 'Update Product' : 'Create Product'}</Button>
             </form>
           </Form>
         </DialogContent>
@@ -393,79 +416,80 @@ function DashboardContent() {
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
           <DialogContent>
               <DialogHeader><DialogTitle>New Category</DialogTitle></DialogHeader>
-              <Input placeholder="Category Name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
-              <DialogFooter><Button onClick={handleAddCategory}>Add</Button></DialogFooter>
+              <Input placeholder="Category Name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="rounded-xl" />
+              <DialogFooter><Button onClick={handleAddCategory} className="rounded-full">Add Category</Button></DialogFooter>
           </DialogContent>
       </Dialog>
       
       <Dialog open={isStyleDialogOpen} onOpenChange={setIsStyleDialogOpen}>
           <DialogContent>
               <DialogHeader><DialogTitle>New Style</DialogTitle></DialogHeader>
-              <Input placeholder="Style Name" value={newStyleName} onChange={(e) => setNewStyleName(e.target.value)} />
-              <DialogFooter><Button onClick={handleAddStyle}>Add</Button></DialogFooter>
+              <Input placeholder="Style Name" value={newStyleName} onChange={(e) => setNewStyleName(e.target.value)} className="rounded-xl" />
+              <DialogFooter><Button onClick={handleAddStyle} className="rounded-full">Add Style</Button></DialogFooter>
           </DialogContent>
       </Dialog>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoadingProducts && Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {isLoadingProducts && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-64 rounded-3xl" />)}
         {products?.map(product => (
-          <Card key={product.id}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex justify-between items-start">
-                <span className="truncate flex items-center gap-2">
-                  {product.isFeatured && <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />}
-                  {product.name}
-                </span>
-                 <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(product)}><Edit className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id)}><Trash className="h-4 w-4 text-destructive" /></Button>
+          <Card key={product.id} className="group border-2 border-black rounded-3xl overflow-hidden hover:shadow-xl transition-all">
+            <div className="aspect-[4/5] relative bg-gray-100">
+                {product.images?.[0]?.url && (
+                    <img src={product.images[0].url} alt={product.name} className="w-full h-full object-cover" />
+                )}
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-2">
+                    <Button variant="secondary" size="icon" className="rounded-full h-9 w-9 shadow-md" onClick={() => openEditDialog(product)}><Edit className="h-4 w-4" /></Button>
+                    <Button variant="destructive" size="icon" className="rounded-full h-9 w-9 shadow-md" onClick={() => handleDelete(product.id)}><Trash className="h-4 w-4" /></Button>
                 </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-bold">Ksh {product.price}</p>
-              <p className="text-sm text-muted-foreground uppercase">{product.category}</p>
+                {product.isFeatured && <div className="absolute top-2 left-2 bg-yellow-400 p-1.5 rounded-full shadow-md"><Star className="h-4 w-4 fill-black" /></div>}
+            </div>
+            <CardContent className="p-4">
+              <div className="flex justify-between items-start gap-2">
+                <h3 className="font-bold truncate text-sm flex-grow">{product.name}</h3>
+                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full uppercase font-bold">{product.category}</span>
+              </div>
+              <p className="text-lg font-black mt-1">Ksh {product.price.toLocaleString()}</p>
             </CardContent>
-            <CardFooter className="pt-0 text-sm font-medium">
-                Sales: {salesCount[product.id] || 0}
-            </CardFooter>
           </Card>
         ))}
       </div>
 
-      <Separator className="my-12" />
+      <Separator className="my-16" />
 
-      <h2 className="text-2xl font-bold mb-6">Recent Orders</h2>
-      <Card>
+      <h2 className="text-3xl font-black mb-8">Order History</h2>
+      <Card className="border-2 border-black rounded-3xl overflow-hidden shadow-[8px_8px_0_0_rgba(0,0,0,1)]">
         <CardContent className="p-0 overflow-x-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-gray-50 border-b-2 border-black">
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="font-bold text-black uppercase tracking-tighter">Date</TableHead>
+                <TableHead className="font-bold text-black uppercase tracking-tighter">Customer</TableHead>
+                <TableHead className="font-bold text-black uppercase tracking-tighter">Items</TableHead>
+                <TableHead className="font-bold text-black uppercase tracking-tighter">Total</TableHead>
+                <TableHead className="font-bold text-black uppercase tracking-tighter text-right">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoadingOrders && <TableRow><TableCell colSpan={5} className="text-center">Loading orders...</TableCell></TableRow>}
+              {isLoadingOrders && <TableRow><TableCell colSpan={5} className="text-center h-32">Loading orders...</TableCell></TableRow>}
               {orders?.map(order => (
-                <TableRow key={order.id}>
-                  <TableCell className="whitespace-nowrap">{order.createdAt ? format((order.createdAt as Timestamp).toDate(), 'PP') : 'N/A'}</TableCell>
+                <TableRow key={order.id} className="hover:bg-gray-50/50">
+                  <TableCell className="whitespace-nowrap font-medium">{order.createdAt ? format((order.createdAt as Timestamp).toDate(), 'PP') : 'N/A'}</TableCell>
                   <TableCell>
-                    <div className="font-medium">{order.customerName}</div>
-                    <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-xs">
-                        {order.products.map(p => `${p.name} x${p.quantity}`).join(', ')}
+                    <div className="font-black text-sm">{order.customerName}</div>
+                    <div className="text-xs text-muted-foreground flex flex-col">
+                        <span>{order.customerPhone}</span>
+                        <span className="truncate max-w-[150px]">{order.customerEmail}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-bold">Ksh {order.totalAmount}</TableCell>
+                  <TableCell>
+                    <div className="text-xs font-medium">
+                        {order.products.map(p => `${p.name} (x${p.quantity})`).join(', ')}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-black">Ksh {order.totalAmount.toLocaleString()}</TableCell>
                   <TableCell className="text-right">
                     <Select value={order.status} onValueChange={(s) => handleUpdateOrderStatus(order.id, s as any)}>
-                      <SelectTrigger className="w-[120px] h-8 text-xs ml-auto"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="w-[120px] h-9 text-xs ml-auto rounded-full font-bold border-2"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="shipped">Shipped</SelectItem>
@@ -476,7 +500,7 @@ function DashboardContent() {
                   </TableCell>
                 </TableRow>
               ))}
-              {!isLoadingOrders && orders?.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-24">No orders yet.</TableCell></TableRow>}
+              {!isLoadingOrders && orders?.length === 0 && <TableRow><TableCell colSpan={5} className="text-center h-32 text-muted-foreground italic">No orders recorded yet.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
@@ -519,9 +543,9 @@ export default function AdminDashboard() {
   if (!ADMIN_EMAIL) {
     return (
       <div className="container mx-auto py-12 flex justify-center">
-        <Alert variant="destructive" className="max-w-md">
+        <Alert variant="destructive" className="max-w-md border-2 border-destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Configuration Missing</AlertTitle>
+          <AlertTitle className="font-bold">Configuration Missing</AlertTitle>
           <AlertDescription>
             The <code>NEXT_PUBLIC_ADMIN_EMAIL</code> environment variable is not set. 
             Please check your <code>.env</code> file and restart the server.
@@ -538,49 +562,61 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="container mx-auto py-12 flex justify-center items-center min-h-[60vh]">
-      <Card className="w-full max-w-sm">
+    <div className="container mx-auto py-12 flex justify-center items-center min-h-[70vh] px-4">
+      <Card className="w-full max-w-sm border-2 border-black shadow-[12px_12px_0_0_rgba(0,0,0,1)] rounded-3xl p-4">
         <CardHeader className="text-center">
-          <CardTitle>Admin Login</CardTitle>
-          <CardDescription>Enter admin credentials to continue</CardDescription>
+          <CardTitle className="text-3xl font-black">Admin Access</CardTitle>
+          <CardDescription className="font-medium">Enter credentials to manage your store</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
-             <Input
-              type="email"
-              placeholder="Admin Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoggingIn}
-              required
-            />
-            <Input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoggingIn}
-              required
-            />
-            <Button type="submit" disabled={isLoggingIn} className="w-full">
-              {isLoggingIn ? 'Logging In...' : 'Login'}
+             <div className="space-y-2">
+                 <FormLabel className="font-bold text-xs uppercase tracking-widest ml-1">Email</FormLabel>
+                 <Input
+                  type="email"
+                  placeholder="admin@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoggingIn}
+                  required
+                  className="rounded-2xl h-12 border-2"
+                />
+             </div>
+             <div className="space-y-2">
+                 <FormLabel className="font-bold text-xs uppercase tracking-widest ml-1">Password</FormLabel>
+                 <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoggingIn}
+                  required
+                  className="rounded-2xl h-12 border-2"
+                />
+             </div>
+            <Button type="submit" disabled={isLoggingIn} className="w-full h-14 rounded-2xl text-lg font-black mt-4 shadow-lg">
+              {isLoggingIn ? 'Verifying...' : 'Login to Dashboard'}
             </Button>
-            {loginError && <p className="text-xs text-destructive text-center font-medium">{loginError}</p>}
+            {loginError && (
+                <Alert variant="destructive" className="mt-4 p-2 py-3 rounded-xl border-2">
+                    <AlertDescription className="text-xs font-bold text-center">{loginError}</AlertDescription>
+                </Alert>
+            )}
             
             {user && !isAuthorized && (
-                <div className="mt-4 p-3 bg-muted rounded-md text-xs text-center text-destructive">
-                    Logged in as <strong>{user.email}</strong>, which is not the configured admin email. 
-                    Expected: <strong>{ADMIN_EMAIL}</strong>.
-                    <Button variant="link" size="sm" onClick={() => auth.signOut()} className="mt-1 block mx-auto">Sign Out</Button>
+                <div className="mt-6 p-4 bg-red-50 border-2 border-red-100 rounded-2xl text-xs text-center">
+                    <p className="text-red-800 font-bold mb-1 italic">Unauthorized Account</p>
+                    <p className="text-red-600 mb-3">Logged in as <strong>{user.email}</strong>, which is not the configured admin email.</p>
+                    <Button variant="outline" size="sm" onClick={() => auth.signOut()} className="w-full rounded-xl border-2 border-red-200 text-red-700 hover:bg-red-100">Switch Account</Button>
                 </div>
             )}
           </form>
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg text-xs text-muted-foreground">
-              <p className="font-bold mb-1">Getting Started:</p>
-              <ul className="list-disc pl-4 space-y-1">
-                  <li>Configure <code>NEXT_PUBLIC_ADMIN_EMAIL</code> in <code>.env</code></li>
-                  <li>Create this user in <strong>Firebase Console &gt; Authentication</strong></li>
-                  <li>Restart your local server after updating <code>.env</code></li>
+          <div className="mt-8 p-4 bg-gray-50 rounded-2xl text-[10px] text-muted-foreground border-2 border-gray-100 border-dashed">
+              <p className="font-black text-black mb-1 uppercase tracking-widest">Configuration Status:</p>
+              <ul className="space-y-1">
+                  <li className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-green-500"></div> Auth System: Active</li>
+                  <li className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-green-500"></div> Target Email: {ADMIN_EMAIL}</li>
+                  <li className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div> Requirement: User must exist in Firebase</li>
               </ul>
           </div>
         </CardContent>
